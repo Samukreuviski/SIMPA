@@ -1,0 +1,17 @@
+# Python ignorados
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes Virtuais
+venv/
+env/
+ENV/
+.venv/
+
+# Variáveis de ambiente
+.env
+
+# VS Code/IDE
+.vscode/
+.idea/
