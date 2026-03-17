@@ -24,9 +24,9 @@ A base do projeto está sendo construída com as seguintes tecnologias e formato
 ## 👥 Equipe e Papéis
 O projeto está sendo desenvolvido de forma colaborativa. As principais frentes de atuação da equipe neste ciclo foram organizadas da seguinte forma:
 
-* **Lavínia (Scrum Master):** Organização do projeto, gerenciamento do backlog, planejamento, levantamento de requisitos e coordenação da arquitetura.
-* **Jordan (Design):** Planejamento visual, estruturação do guia de design e elaboração de wireframes para os futuros dashboards.
-* **Samuel (Front-end):** Estruturação inicial da interface visual e planejamento de como os dados serão integrados no lado do cliente (Front-end).
-* **Jota (Back-end):** Criação da estrutura da API, desenvolvimento das rotas, lógica do sistema e integração com os arquivos de dados.
-* **Luis (Dados):** Criação da base de dados, limpeza, tratamento e padronização das informações para uso na API.
-* **Iram (Produto/Documentação):** Elaboração da documentação técnica do projeto, modelagem UML e preparação da apresentação.
+* **Lavínia Carvalhaes (Scrum Master):** Organização do projeto, gerenciamento do backlog, planejamento, levantamento de requisitos e coordenação da arquitetura.
+* **Jordan Vidal (Design):** Planejamento visual, estruturação do guia de design e elaboração de wireframes para os futuros dashboards.
+* **Samuell Faleiro (Front-end):** Estruturação inicial da interface visual e planejamento de como os dados serão integrados no lado do cliente (Front-end).
+* **João Victor Domingues (Back-end):** Criação da estrutura da API, desenvolvimento das rotas, lógica do sistema e integração com os arquivos de dados.
+* **Luis Felipe (Dados):** Criação da base de dados, limpeza, tratamento e padronização das informações para uso na API.
+* **Iram Soares (Produto/Documentação):** Elaboração da documentação técnica do projeto, modelagem UML e preparação da apresentação.
