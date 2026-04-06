@@ -1,20 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
 
-# Classe Aluno: dados pessoais e de matrícula gerais do aluno
-class Aluno(BaseModel):
-    id_aluno: str
-    sexo: str
-    data_nascimento: str
-    cidade: str
-    estado: str
-    ano_ingresso: int
-    sem_ingresso: int
-    unidade: str
-    prouni: str   #  'SIM' ou 'NAO'
-    fies: str     #  'SIM' ou 'NAO'
-    bolsa: str    #  'INTEGRAL', 'PARCIAL', 'NENHUMA'
-
 # Classe Curso: curso do banco de dados
 class Curso(BaseModel):
     cod_curso: str
@@ -45,7 +31,7 @@ class RegistroAcademico(BaseModel):
 
     # Método de Cálculo de Média da classe
     def calcular_media(self):
-    
+
         return (self.va1 + self.va2 + self.va3) / 3.0 # média das 3 notas
 
     # Método para atualizar a coluna "SITUAÇÃO" baseado nas notas
