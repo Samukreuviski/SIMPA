@@ -6,6 +6,9 @@ function Predicao() {
   const [loading, setLoading] = useStateP(true);
   const [erro,    setErro]    = useStateP(false);
   const [filtro,  setFiltro]  = useStateP('todos');
+  const [filtroTurma, setFiltroTurma] = useStateP('todas');
+  const [turmasDisponiveis, setTurmasDisponiveis] = useStateP([]);
+  const [alunoSelecionado, setAlunoSelecionado] = useStateP(null);
   const [pagina,  setPagina]  = useStateP(1);
   const lineRef  = useRefP(null);
   const lineInst = useRefP(null);
@@ -19,16 +22,29 @@ function Predicao() {
       .then(([alunos, boletins, predicoes]) => {
         if (!predicoes || predicoes.length === 0) { setErro(true); setLoading(false); return; }
 
-        // Mapa de boletim por aluno_id para calcular média real
+        // Mapa de boletim e turma por aluno_id
         const boletimMap = {};
+        const turmaMap = {};
+        const turmasSet = new Set();
+
         boletins.forEach(b => {
           if (b && b.id_aluno && b.boletim) {
             const medias = b.boletim.map(r => Utils.calcMedia(r));
             boletimMap[String(b.id_aluno)] = medias.length > 0
               ? medias.reduce((a, c) => a + c, 0) / medias.length
               : 0;
+            
+            // Pega a turma
+            b.boletim.forEach(reg => {
+              if (reg.turma) {
+                turmaMap[String(b.id_aluno)] = reg.turma;
+                turmasSet.add(reg.turma);
+              }
+            });
           }
         });
+
+        setTurmasDisponiveis(Array.from(turmasSet).sort());
 
         // Mapa de curso por aluno_id
         const cursoMap = {};
@@ -57,6 +73,7 @@ function Predicao() {
               aluno_id: id,
               nome: Utils.nomeAluno(id),
               curso: cursoMap[id] || '—',
+              turma: turmaMap[id] || 'S/T',
               nota_media: parseFloat(nota.toFixed(1)),
               frequencia: freq,
               pontuacao_risco: irc,
@@ -76,13 +93,19 @@ function Predicao() {
       .catch(() => { setErro(true); setLoading(false); });
   }, []);
 
-  // Gráfico de projeção (usa médias reais do primeiro aluno de maior risco)
+  // Gráfico de projeção (usa médias reais do aluno selecionado)
   useEffectP(() => {
     if (loading || !lineRef.current || riscos.length === 0) return;
     if (lineInst.current) lineInst.current.destroy();
 
-    // Pega o aluno com maior risco para mostrar projeção
-    const top = riscos[0];
+    // Pega o aluno selecionado (ou o de maior risco filtrado)
+    let filtrados = riscos;
+    if (filtro !== 'todos') filtrados = filtrados.filter(r => r.nivel_risco === filtro);
+    if (filtroTurma !== 'todas') filtrados = filtrados.filter(r => r.turma === filtroTurma);
+    
+    if (filtrados.length === 0) return; // Nada a mostrar
+
+    const top = filtrados.find(r => r.aluno_id === alunoSelecionado) || filtrados[0];
     const hist = top.historico || [];
     const previsao = top.previsao;
     const labels = hist.map((_, i) => `Período ${i + 1}`);
@@ -125,7 +148,7 @@ function Predicao() {
       }
     });
     return () => { if (lineInst.current) lineInst.current.destroy(); };
-  }, [loading, riscos]);
+  }, [loading, riscos, alunoSelecionado, filtro, filtroTurma]);
 
   // Scatter plot (frequência × nota)
   useEffectP(() => {
@@ -159,8 +182,11 @@ function Predicao() {
   }, [loading, riscos]);
 
   const filtrados = useMemoP(() => {
-    return filtro === 'todos' ? riscos : riscos.filter(r => r.nivel_risco === filtro);
-  }, [riscos, filtro]);
+    let result = riscos;
+    if (filtro !== 'todos') result = result.filter(r => r.nivel_risco === filtro);
+    if (filtroTurma !== 'todas') result = result.filter(r => r.turma === filtroTurma);
+    return result;
+  }, [riscos, filtro, filtroTurma]);
 
   const totalPags = Math.ceil(filtrados.length / POR_PAGINA);
   const items = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
@@ -199,9 +225,9 @@ function Predicao() {
       <div className="charts-grid">
         <div className="chart-card">
           <div className="chart-title">Projeção de Notas</div>
-          <div className="chart-subtitle">Histórico real + projeção do aluno em maior risco</div>
+          <div className="chart-subtitle">Histórico real + projeção (Clique na tabela para ver um aluno específico)</div>
           <div className="chart-canvas-wrap"><canvas ref={lineRef} id="projecao-chart" /></div>
-          <InsightCard text="A linha tracejada representa a projeção calculada pelo motor de regressão linear do backend com base no histórico real de notas do aluno." />
+          <InsightCard text="A linha tracejada representa a projeção calculada pelo motor de regressão linear do backend com base no histórico real de notas do aluno selecionado." />
         </div>
         <div className="chart-card">
           <div className="chart-title">Radar de Risco</div>
@@ -222,30 +248,44 @@ function Predicao() {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:10 }}>
           <div className="section-title" style={{ margin:0 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Alunos em Risco ({riscos.length} analisados)
+            Alunos Analisados ({filtrados.length})
           </div>
-          <select id="filtro-risco-select" className="filter-select" value={filtro} onChange={e => { setFiltro(e.target.value); setPagina(1); }}>
-            <option value="todos">Todos os níveis</option>
-            <option value="critico">Crítico</option>
-            <option value="alto">Alto</option>
-            <option value="medio">Médio</option>
-            <option value="baixo">Baixo</option>
-          </select>
+          <div style={{ display:'flex', gap: 10 }}>
+            <select className="filter-select" value={filtroTurma} onChange={e => { setFiltroTurma(e.target.value); setPagina(1); setAlunoSelecionado(null); }}>
+              <option value="todas">Todas as Turmas</option>
+              {turmasDisponiveis.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select id="filtro-risco-select" className="filter-select" value={filtro} onChange={e => { setFiltro(e.target.value); setPagina(1); setAlunoSelecionado(null); }}>
+              <option value="todos">Todos os níveis de Risco</option>
+              <option value="critico">Crítico</option>
+              <option value="alto">Alto</option>
+              <option value="medio">Médio</option>
+              <option value="baixo">Baixo</option>
+            </select>
+          </div>
         </div>
 
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Aluno</th><th>Curso</th><th>Nota Média</th><th>Freq. Est.</th><th>Score Risco</th><th>Nível</th><th>Prob. Reprovação</th><th>Previsão</th></tr>
+              <tr><th>Aluno</th><th>Turma</th><th>Nota Média</th><th>Freq. Est.</th><th>Score Risco</th><th>Nível</th><th>Prob. Reprovação</th><th>Previsão</th></tr>
             </thead>
             <tbody>
               {items.length === 0 && <tr><td colSpan={8}><EmptyState title="Nenhum aluno neste nível" /></td></tr>}
               {items.map(a => {
                 const b = Utils.riscoBadge(a.nivel_risco);
+                const isSelected = alunoSelecionado === a.aluno_id;
                 return (
-                  <tr key={a.aluno_id}>
+                  <tr 
+                    key={a.aluno_id} 
+                    style={{ cursor: 'pointer', backgroundColor: isSelected ? 'rgba(58,173,229,.1)' : undefined }}
+                    onClick={() => {
+                      setAlunoSelecionado(a.aluno_id);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  >
                     <td style={{ fontWeight:600 }}>{a.nome}</td>
-                    <td style={{ fontSize:'.8rem', color:'var(--gray-text)' }}>{a.curso}</td>
+                    <td style={{ fontSize:'.8rem', color:'var(--gray-text)' }}>{a.turma}</td>
                     <td className={Utils.notaClass(a.nota_media)}>{a.nota_media.toFixed(1)}</td>
                     <td style={{ color: a.frequencia < 70 ? 'var(--red)' : 'inherit', fontWeight: a.frequencia < 70 ? 700 : 400 }}>{a.frequencia}%</td>
                     <td>
