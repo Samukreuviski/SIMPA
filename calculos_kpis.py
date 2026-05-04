@@ -1,4 +1,5 @@
 import math
+import numpy as np
 
 class KPIAluno:
     """Indicadores de Desempenho relacionados estritamente ao Aluno."""
@@ -28,25 +29,39 @@ class KPIAluno:
         return round((freq_percentual * 0.5) + (entregas_percentual * 0.5), 2)
 
 
-class KPITurma:
-    """Indicadores de Desempenho operando em nível de Turma Inteira."""
+class AnaliseTurma:
+    """Indicadores de Desempenho operando em nível de Turma Inteira (Orientado a Objeto com NumPy)."""
+    
+    def __init__(self):
+        pass
 
-    @staticmethod
-    def taxa_aprovacao(aprovados: int, total_alunos: int) -> float:
+    def calcular_metricas_turma(self, dados_notas: list) -> dict:
+        """
+        Retorna Média, Variância e Desvio Padrão usando NumPy de uma vez.
+        """
+        if not dados_notas:
+            return {"media": 0.0, "variancia": 0.0, "desvio_padrao": 0.0}
+            
+        arr_notas = np.array(dados_notas)
+        
+        return {
+            "media": round(np.mean(arr_notas), 2),
+            "variancia": round(np.var(arr_notas), 2),
+            "desvio_padrao": round(np.std(arr_notas), 2)
+        }
+
+    def taxa_aprovacao(self, aprovados: int, total_alunos: int) -> float:
         """Aprovados / Total × 100"""
         if total_alunos == 0: return 0.0
         return round((aprovados / total_alunos) * 100, 2)
 
-    @staticmethod
-    def desvio_padrao(notas: list) -> float:
-        """σ = √(Σ(Xi - X̄)² / n)"""
+    def desvio_padrao(self, notas: list) -> float:
+        """Calcula o desvio padrão via NumPy"""
         if not notas or len(notas) == 0: return 0.0
-        media = sum(notas) / len(notas)
-        variancia = sum((x - media)**2 for x in notas) / len(notas)
-        return round(math.sqrt(variancia), 2)
+        arr_notas = np.array(notas)
+        return round(np.std(arr_notas), 2)
 
-    @staticmethod
-    def indice_homogeneidade(media_turma: float, desvio_padrao: float) -> float:
+    def indice_homogeneidade(self, media_turma: float, desvio_padrao: float) -> float:
         """1 - (σ / Média) → quanto mais próximo de 1, mais uniforme/coesa a turma é."""
         if media_turma == 0: return 0.0
         homogeneidade = 1 - (desvio_padrao / media_turma)

@@ -8,10 +8,16 @@ import os
 
 from calculos_predicao import PreditorDesempenho, AnaliseTendencia
 from calculos_risco import AnaliseRisco
-from calculos_kpis import KPIAluno, KPITurma, KPIProfessor, KPIArea
+from calculos_kpis import KPIAluno, AnaliseTurma, KPIProfessor, KPIArea
 from calculos_estatistica import EstatisticaGeral
 
 app = FastAPI() # api mais complexa que o flask, mas melhor
+
+# Instancias das novas classes OO
+preditor = PreditorDesempenho()
+analise_tend = AnaliseTendencia()
+analise_turma = AnaliseTurma()
+estatistica = EstatisticaGeral()
 
 # Prepara a infraestrutura para nosso front-end mágico
 if not os.path.exists("frontend_dashboard"):
@@ -147,10 +153,10 @@ def estatisticas_avancadas():
     evadidos = int(contagens.get('Reprovado', 0) + contagens.get('Reprovado por Falta', 0))
     taxa_reprovacao = (evadidos / total) * 100 if total > 0 else 0
 
-    quartis = EstatisticaGeral.calcular_quartis(todas_notas)
-    dp_geral = KPITurma.desvio_padrao(todas_notas)
+    quartis = estatistica.calcular_quartis(todas_notas)
+    dp_geral = analise_turma.desvio_padrao(todas_notas)
     media_global = sum(todas_notas)/len(todas_notas) if todas_notas else 0
-    homogeneidade = KPITurma.indice_homogeneidade(media_global, dp_geral)
+    homogeneidade = analise_turma.indice_homogeneidade(media_global, dp_geral)
     indice_retencao = KPIProfessor.indice_retencao(taxa_reprovacao)
     
     return {
@@ -184,14 +190,14 @@ def predicao_aluno(id_aluno: str):
     media_anterior = medias_historicas[-2] if len(medias_historicas) > 1 else media_atual
     
     # Motor de Predição e Tendência
-    linear = PreditorDesempenho.regressao_linear_simples(medias_historicas)
-    tendencia = AnaliseTendencia.calcular_tendencia(media_atual, media_anterior)
-    arima = AnaliseTendencia.prever_arima_simplificado(medias_historicas)
+    linear = preditor.regressao_linear_simples(medias_historicas)
+    tendencia = analise_tend.calcular_tendencia(media_atual, media_anterior)
+    arima = analise_tend.prever_arima_simplificado(medias_historicas)
     
     # KPIs e Score (simulando 80% Freq)
     # Obs: Adaptável pro futuro com base na frequência da tabela real.
     freq_simulada = max(50.0, min(100.0, media_atual * 10 + 20))
-    risco_log = PreditorDesempenho.regressao_logistica_probabilidade(media_atual, freq_simulada)
+    risco_log = preditor.regressao_logistica_probabilidade(media_atual, freq_simulada)
     score_nota = AnaliseRisco.analisar_score_nota(media_atual)
     irc = AnaliseRisco.indice_risco_combinado(media_atual, freq_simulada)
 
