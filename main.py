@@ -10,6 +10,7 @@ from calculos_predicao import PreditorDesempenho, AnaliseTendencia
 from calculos_risco import AnaliseRisco
 from calculos_kpis import KPIAluno, AnaliseTurma, KPIProfessor, KPIArea
 from calculos_estatistica import EstatisticaGeral
+from sistema_academico.Banco_Dados_Academico.data_base import obter_tabela_alunos
 
 app = FastAPI() # api mais complexa que o flask, mas melhor
 
@@ -32,34 +33,25 @@ def abrir_painel():
         return FileResponse(caminho_index)
     return {"erro": "Arquivo index.html não localizado na pasta frontend_dashboard."}
 
-# local onde atualizamos o banco de dados, que atualmente é um excel
-CAMINHO_BANCO = "sistema_academico/Banco_Dados_Academico/Banco_Dados_Academico.xlsx"
-
+# Agora testamos a conexão com o banco de dados PostgreSQL
 @app.get("/")
 def pagina_inicial():
     return {"mensagem": "API de Leitura e Predição Acadêmica pronta! Acesse /docs"}
 
-# Assim que a API for chamada, aqui testamos o banco de dados
 def ler_banco_de_dados():
-    # Verifica se o arquivo já foi colocado na pasta
-    if not os.path.exists(CAMINHO_BANCO):
+    tabela = obter_tabela_alunos()
+    
+    if tabela is None:
         return None
         
-    try:
-        # O Pandas transforma a planilha do Excel em uma tabela interna do Python chamada DataFrame
-        tabela = pd.read_excel(CAMINHO_BANCO)
-        
-        # Como o Pandas lê tudo, campos vazios precisam ser tratados, trocando por 0 ou texto vazio)
-        tabela.fillna({
-            'VA1': 0.0, 'VA2': 0.0, 'VA3': 0.0,
-            'PROUNI': 'NAO INFORMADO', 'FIES': 'NAO INFORMADO', 'BOLSA': 'NENHUMA',
-            'SITUAÇÃO': 'Cursando'
-        }, inplace=True)
-        
-        return tabela
-    except Exception as e:
-        print(f"Erro ao ler o arquivo: {e}")
-        return None
+    # Como o Pandas lê tudo, campos vazios precisam ser tratados, trocando por 0 ou texto vazio)
+    tabela.fillna({
+        'VA1': 0.0, 'VA2': 0.0, 'VA3': 0.0,
+        'PROUNI': 'NAO INFORMADO', 'FIES': 'NAO INFORMADO', 'BOLSA': 'NENHUMA',
+        'SITUAÇÃO': 'Cursando'
+    }, inplace=True)
+    
+    return tabela
 
 
 # ROTAS DE CONSULTA E PREDIÇÃO
