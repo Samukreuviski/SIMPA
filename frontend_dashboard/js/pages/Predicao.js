@@ -1,325 +1,459 @@
-/** Predicao.js — Predição com dados reais de /predicao/{id} + /registros/{id} */
-const { useState: useStateP, useEffect: useEffectP, useRef: useRefP, useMemo: useMemoP } = React;
+/**
+ * Predicao.js — Predicta
+ * Filtros superiores + 6 gráficos Chart.js com tooltips didáticos "?".
+ * Botão "Detalhamento" abre FilterPanel lateral.
+ */
 
-function Predicao() {
-  const [riscos,  setRiscos]  = useStateP([]);
-  const [loading, setLoading] = useStateP(true);
-  const [erro,    setErro]    = useStateP(false);
-  const [filtro,  setFiltro]  = useStateP('todos');
-  const [filtroTurma, setFiltroTurma] = useStateP('todas');
-  const [turmasDisponiveis, setTurmasDisponiveis] = useStateP([]);
-  const [alunoSelecionado, setAlunoSelecionado] = useStateP(null);
-  const [pagina,  setPagina]  = useStateP(1);
-  const lineRef  = useRefP(null);
-  const lineInst = useRefP(null);
-  const scatterRef  = useRefP(null);
-  const scatterInst = useRefP(null);
-  const POR_PAGINA = 8;
+import { state }           from '../state.js';
+import { MOCK_DATA }       from '../mockData.js';
+import { openFilterPanel } from '../components/FilterPanel.js';
 
-  useEffectP(() => {
-    // Carrega alunos, boletins e predições em paralelo
-    Promise.all([API.getAlunos(), API.getAllBoletins(), API.getAllPredictions()])
-      .then(([alunos, boletins, predicoes]) => {
-        if (!predicoes || predicoes.length === 0) { setErro(true); setLoading(false); return; }
+// Descrições didáticas dos indicadores
+const TOOLTIPS = {
+  regressao: {
+    titulo: 'Regressão Linear / Matricial',
+    texto: `Imagine que você quer saber se um aluno que estuda mais horas tira notas melhores.
+A regressão linear é como traçar a "linha de tendência" perfeita no meio dos pontos do gráfico.
+Ela mostra a direção geral: se as notas estão subindo ou descendo conforme o tempo passa.`,
+  },
+  variancia: {
+    titulo: 'Variância',
+    texto: `Imagine que 5 amigos medem sua altura e os resultados são: 1,60m, 1,75m, 1,62m, 1,80m, 1,58m.
+A variância mede o quanto essas medidas são "espalhadas" em relação à média.
+Se todos tivessem a mesma altura, a variância seria zero. Quanto maior a variância, mais "bagunçadas" são as notas.`,
+  },
+  mediaMediana: {
+    titulo: 'Média e Mediana',
+    texto: `A média é a soma de todas as notas dividida pelo número de alunos — é o "valor médio".
+A mediana é a nota do aluno que fica bem no meio: metade tirou mais, metade tirou menos.
+Quando a mediana é muito diferente da média, significa que há alunos com notas muito diferentes dos demais.`,
+  },
+  homogeneidade: {
+    titulo: 'Homogeneidade dos Dados',
+    texto: `Imagine uma turma onde todos tiram entre 6 e 7. Essa turma é homogênea — todo mundo está no mesmo nível.
+Agora imagine uma turma onde alguns tiram 10 e outros tiram 2. Essa é heterogênea.
+A homogeneidade mede o quanto os alunos de uma turma são parecidos no desempenho.`,
+  },
+  desvioPadrao: {
+    titulo: 'Desvio Padrão',
+    texto: `O desvio padrão é como a "distância média" que cada aluno está da média da turma.
+Se a média é 7 e o desvio é 1, a maioria tira entre 6 e 8.
+Se o desvio é 3, há alunos tirando 4 e outros tirando 10! Quanto menor o desvio, mais uniforme é a turma.`,
+  },
+  registros: {
+    titulo: 'Quantidade de Registros Analisados',
+    texto: `Este número mostra quantos alunos (registros) estão sendo considerados nos cálculos atuais.
+Quando você aplica filtros (por curso, turma ou data), esse número diminui para mostrar apenas
+os alunos selecionados. Assim você garante que as estatísticas são sobre o grupo que você escolheu analisar.`,
+  },
+};
 
-        // Mapa de boletim e turma por aluno_id
-        const boletimMap = {};
-        const turmaMap = {};
-        const turmasSet = new Set();
+let _charts = {};
 
-        boletins.forEach(b => {
-          if (b && b.id_aluno && b.boletim) {
-            const medias = b.boletim.map(r => Utils.calcMedia(r));
-            boletimMap[String(b.id_aluno)] = medias.length > 0
-              ? medias.reduce((a, c) => a + c, 0) / medias.length
-              : 0;
-            
-            // Pega a turma
-            b.boletim.forEach(reg => {
-              if (reg.turma) {
-                turmaMap[String(b.id_aluno)] = reg.turma;
-                turmasSet.add(reg.turma);
-              }
-            });
-          }
-        });
+export async function renderPredicao(container) {
+  const data = MOCK_DATA.estatisticas;
 
-        setTurmasDisponiveis(Array.from(turmasSet).sort());
+  // Reset period label
+  const periodoEl = document.getElementById('greeting-period');
+  if (periodoEl) {
+    periodoEl.innerHTML = `
+      <span>Período: <strong>26/03/2026 a 26/05/2026</strong></span>
+      <span class="period-badge">Semana 8/12</span>
+    `;
+  }
 
-        // Mapa de curso por aluno_id
-        const cursoMap = {};
-        if (alunos) alunos.forEach(a => { cursoMap[String(a.ID_ALUNO)] = a.NOME_CURSO || '—'; });
+  container.innerHTML = `
+    <div class="page-fade-in">
 
-        // Constrói array de riscos a partir das predições reais
-        const riscoList = predicoes
-          .filter(p => !p.erro)
-          .map(p => {
-            const id   = String(p.aluno_id);
-            const ircRaw = Utils.parseIRC(p.score_e_risco?.indice_risco_combinado_irc);
-            // Clamp IRC to 0-100 since backend sometimes sends negative numbers
-            const irc  = Math.max(0, Math.min(100, ircRaw));
-            const nivel= Utils.ircToNivel(irc);
-            const nota = boletimMap[id] ?? (p.historico_analisado?.slice(-1)[0] || 0);
-            
-            // Frequência simulada (mesma fórmula do backend)
-            let freq = Math.round(nota * 10 + 20);
-            // Clamp frequencia to 0-100 to fix backend overflow bugs
-            freq = Math.max(0, Math.min(100, freq));
-            
-            // Clamp prob to 0-100
-            let probRep = parseFloat(p.score_e_risco?.probabilidade_reprovacao) || 0;
-            probRep = Math.max(0, Math.min(100, probRep));
-            return {
-              aluno_id: id,
-              nome: Utils.nomeAluno(id),
-              curso: cursoMap[id] || '—',
-              turma: turmaMap[id] || 'S/T',
-              nota_media: parseFloat(nota.toFixed(1)),
-              frequencia: freq,
-              pontuacao_risco: irc,
-              nivel_risco: nivel,
-              prob_reprovacao: probRep,
-              historico: p.historico_analisado || [],
-              previsao: p.motor_predicao?.previsao_proxima_nota,
-              tendencia: p.motor_predicao?.curva_tendencia_percentual,
-              score_desempenho: p.score_e_risco?.score_desempenho,
-            };
-          })
-          .sort((a, b) => b.pontuacao_risco - a.pontuacao_risco);
-
-        setRiscos(riscoList);
-        setLoading(false);
-      })
-      .catch(() => { setErro(true); setLoading(false); });
-  }, []);
-
-  // Gráfico de projeção (usa médias reais do aluno selecionado)
-  useEffectP(() => {
-    if (loading || !lineRef.current || riscos.length === 0) return;
-    if (lineInst.current) lineInst.current.destroy();
-
-    // Pega o aluno selecionado (ou o de maior risco filtrado)
-    let filtrados = riscos;
-    if (filtro !== 'todos') filtrados = filtrados.filter(r => r.nivel_risco === filtro);
-    if (filtroTurma !== 'todas') filtrados = filtrados.filter(r => r.turma === filtroTurma);
-    
-    if (filtrados.length === 0) return; // Nada a mostrar
-
-    const top = filtrados.find(r => r.aluno_id === alunoSelecionado) || filtrados[0];
-    const hist = top.historico || [];
-    const previsao = top.previsao;
-    const labels = hist.map((_, i) => `Período ${i + 1}`);
-    if (previsao != null) labels.push('Projeção');
-    const historicoData = hist.map((v, i) => ({ x: i, y: v }));
-    const projecaoData  = previsao != null ? [{ x: hist.length - 1, y: hist[hist.length-1] }, { x: hist.length, y: previsao }] : [];
-
-    lineInst.current = new Chart(lineRef.current, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: `Histórico (${top.nome})`,
-            data: hist,
-            borderColor: '#0B4F7C', backgroundColor: 'rgba(11,79,124,.08)',
-            borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#0B4F7C',
-            fill: true, tension: 0.3,
-          },
-          {
-            label: 'Projeção',
-            data: [...hist.map(() => null), previsao],
-            borderColor: '#3AADE5', borderWidth: 2.5, borderDash: [6, 4],
-            pointRadius: 6, pointBackgroundColor: '#3AADE5',
-            fill: false, tension: 0.3,
-          }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { labels: { font: { size: 12 }, usePointStyle: true } },
-          tooltip: { mode: 'index', intersect: false }
-        },
-        scales: {
-          y: { grid: { color: '#E2E8F0' }, title: { display: true, text: 'Nota Média', font: { size: 11 } } },
-          x: { grid: { display: false }, title: { display: true, text: 'Período', font: { size: 11 } } }
-        },
-        animation: { duration: 500 }
-      }
-    });
-    return () => { if (lineInst.current) lineInst.current.destroy(); };
-  }, [loading, riscos, alunoSelecionado, filtro, filtroTurma]);
-
-  // Scatter plot (frequência × nota)
-  useEffectP(() => {
-    if (loading || !scatterRef.current || riscos.length === 0) return;
-    if (scatterInst.current) scatterInst.current.destroy();
-    const colorMap = { baixo: '#22C55E', medio: '#EAB308', alto: '#F97316', critico: '#EF4444' };
-
-    scatterInst.current = new Chart(scatterRef.current, {
-      type: 'scatter',
-      data: {
-        datasets: [{
-          label: 'Alunos',
-          data: riscos.map(a => ({ x: a.frequencia, y: a.nota_media, nome: a.nome, risco: a.nivel_risco, irc: a.pontuacao_risco })),
-          backgroundColor: riscos.map(a => colorMap[a.nivel_risco] + 'CC'),
-          pointRadius: riscos.map(a => 5 + a.pontuacao_risco / 14),
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: ctx => `${ctx.raw.nome} | Nota: ${ctx.raw.y} | Freq: ${ctx.raw.x}% | IRC: ${ctx.raw.irc}` } }
-        },
-        scales: {
-          x: { min: 45, max: 100, title: { display: true, text: 'Frequência (%)' }, grid: { color: '#E2E8F0' } },
-          y: { title: { display: true, text: 'Nota Média' }, grid: { color: '#E2E8F0' } }
-        }
-      }
-    });
-    return () => { if (scatterInst.current) scatterInst.current.destroy(); };
-  }, [loading, riscos]);
-
-  const filtrados = useMemoP(() => {
-    let result = riscos;
-    if (filtro !== 'todos') result = result.filter(r => r.nivel_risco === filtro);
-    if (filtroTurma !== 'todas') result = result.filter(r => r.turma === filtroTurma);
-    return result;
-  }, [riscos, filtro, filtroTurma]);
-
-  const totalPags = Math.ceil(filtrados.length / POR_PAGINA);
-  const items = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
-
-  const criticos = riscos.filter(r => r.nivel_risco === 'critico').length;
-  const altos    = riscos.filter(r => r.nivel_risco === 'alto').length;
-  const medios   = riscos.filter(r => r.nivel_risco === 'medio').length;
-  const baixos   = riscos.filter(r => r.nivel_risco === 'baixo').length;
-
-  if (loading) return <LoadingState type="page" />;
-  if (erro) return <EmptyState title="Erro ao carregar predições" desc="Verifique se o servidor está rodando." onRetry={() => location.reload()} />;
-
-  return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Predição Acadêmica</h1>
-        <p className="page-subtitle">Projeções e riscos calculados com dados reais do banco acadêmico.</p>
-      </div>
-
-      {/* Banner */}
-      <div className="risk-summary-banner">
-        <div className="rsb-icon">🎯</div>
-        <div>
-          <div className="rsb-title">Resumo Executivo de Predição</div>
-          <div className="rsb-desc">{riscos.length} alunos analisados. {criticos + altos} apresentam risco elevado de reprovação. {criticos} em situação crítica requerem atenção imediata.</div>
-          <div className="risk-levels">
-            <div className="risk-pill critical">🔴 {criticos} Críticos</div>
-            <div className="risk-pill high">🟠 {altos} Altos</div>
-            <div className="risk-pill medium">🟡 {medios} Médios</div>
-            <div className="risk-pill low">🟢 {baixos} Baixos</div>
+      <!-- Barra de filtros superior -->
+      <div class="filters-bar-styled" id="pred-filters-bar">
+        <div class="filter-group">
+          <label class="filter-label" for="pred-curso">Curso</label>
+          <select class="filter-select" id="pred-curso">
+            <option value="">Todos os Cursos</option>
+            ${state.getCursos().map(c => `<option value="${c.id}">${c.nome}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label" for="pred-materia">Componente Curricular</label>
+          <select class="filter-select" id="pred-materia">
+            <option value="">Todas as Matérias</option>
+            ${MOCK_DATA.disciplinas.map(d => `<option value="${d.id}">${d.nome}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-group" style="max-width:160px;">
+          <label class="filter-label" for="pred-data-ini">Data Início</label>
+          <input type="date" class="filter-select" id="pred-data-ini" value="2026-03-26"/>
+        </div>
+        <div class="filter-group" style="max-width:160px;">
+          <label class="filter-label" for="pred-data-fim">Data Fim</label>
+          <input type="date" class="filter-select" id="pred-data-fim" value="2026-05-26"/>
+        </div>
+        <div class="filter-actions">
+          <button class="btn btn-primary" id="btn-apply-filters">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Aplicar
+          </button>
+          <div style="position:relative;">
+            <button class="btn btn-outline" id="btn-detalhamento" title="Filtros avançados">
+              ⚙️ Detalhamento
+            </button>
+            <button class="tooltip-btn" id="btn-det-help" style="position:absolute;top:-8px;right:-8px;"
+                    aria-label="O que é o Detalhamento?">?</button>
+            <div class="tooltip-popup" id="det-tooltip" style="display:none;width:220px;">
+              <strong>Filtros Avançados</strong><br/>
+              Refine os resultados por gênero, turma específica, faixa de notas, nível de risco
+              e intervalo de datas com calendário interativo — como ao buscar uma passagem aérea!
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Gráficos */}
-      <div className="charts-grid">
-        <div className="chart-card">
-          <div className="chart-title">Projeção de Notas</div>
-          <div className="chart-subtitle">Histórico real + projeção (Clique na tabela para ver um aluno específico)</div>
-          <div className="chart-canvas-wrap"><canvas ref={lineRef} id="projecao-chart" /></div>
-          <InsightCard text="A linha tracejada representa a projeção calculada pelo motor de regressão linear do backend com base no histórico real de notas do aluno selecionado." />
-        </div>
-        <div className="chart-card">
-          <div className="chart-title">Radar de Risco</div>
-          <div className="chart-subtitle">Frequência × Nota — IRC (Índice de Risco Combinado)</div>
-          <div className="chart-canvas-wrap"><canvas ref={scatterRef} id="scatter-chart" /></div>
-          <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginTop:10 }}>
-            {[['#22C55E','Baixo'],['#EAB308','Médio'],['#F97316','Alto'],['#EF4444','Crítico']].map(([c,l]) => (
-              <div key={l} style={{ display:'flex', alignItems:'center', gap:5, fontSize:'.72rem', color:'var(--gray-text)' }}>
-                <span style={{ width:10, height:10, borderRadius:'50%', background:c, display:'inline-block' }} />{l}
-              </div>
-            ))}
-          </div>
-        </div>
+      <!-- Gráficos -->
+      <div class="charts-grid">
+        ${makeChartCard('chart-regressao',    'Regressão Linear / Matricial', 'Correlação entre frequência e desempenho', 'regressao')}
+        ${makeChartCard('chart-variancia',    'Variância por Disciplina',     'Dispersão das notas por componente',        'variancia')}
+      </div>
+      <div class="charts-grid">
+        ${makeChartCard('chart-media',        'Média e Mediana por Turma',    'Comparativo de tendência central',          'mediaMediana')}
+        ${makeChartCard('chart-homog',        'Homogeneidade dos Dados',      'Índice de uniformidade por curso',          'homogeneidade')}
+      </div>
+      <div class="charts-grid">
+        ${makeChartCard('chart-dp',           'Desvio Padrão por Curso',      'Variabilidade das notas por curso',         'desvioPadrao')}
+        ${makeStatCountCard(data.registros)}
       </div>
 
-      {/* Tabela de risco */}
-      <div className="section-card">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:10 }}>
-          <div className="section-title" style={{ margin:0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Alunos Analisados ({filtrados.length})
-          </div>
-          <div style={{ display:'flex', gap: 10 }}>
-            <select className="filter-select" value={filtroTurma} onChange={e => { setFiltroTurma(e.target.value); setPagina(1); setAlunoSelecionado(null); }}>
-              <option value="todas">Todas as Turmas</option>
-              {turmasDisponiveis.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select id="filtro-risco-select" className="filter-select" value={filtro} onChange={e => { setFiltro(e.target.value); setPagina(1); setAlunoSelecionado(null); }}>
-              <option value="todos">Todos os níveis de Risco</option>
-              <option value="critico">Crítico</option>
-              <option value="alto">Alto</option>
-              <option value="medio">Médio</option>
-              <option value="baixo">Baixo</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Aluno</th><th>Turma</th><th>Nota Média</th><th>Freq. Est.</th><th>Score Risco</th><th>Nível</th><th>Prob. Reprovação</th><th>Previsão</th></tr>
-            </thead>
-            <tbody>
-              {items.length === 0 && <tr><td colSpan={8}><EmptyState title="Nenhum aluno neste nível" /></td></tr>}
-              {items.map(a => {
-                const b = Utils.riscoBadge(a.nivel_risco);
-                const isSelected = alunoSelecionado === a.aluno_id;
-                return (
-                  <tr 
-                    key={a.aluno_id} 
-                    style={{ cursor: 'pointer', backgroundColor: isSelected ? 'rgba(58,173,229,.1)' : undefined }}
-                    onClick={() => {
-                      setAlunoSelecionado(a.aluno_id);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                  >
-                    <td style={{ fontWeight:600 }}>{a.nome}</td>
-                    <td style={{ fontSize:'.8rem', color:'var(--gray-text)' }}>{a.turma}</td>
-                    <td className={Utils.notaClass(a.nota_media)}>{a.nota_media.toFixed(1)}</td>
-                    <td style={{ color: a.frequencia < 70 ? 'var(--red)' : 'inherit', fontWeight: a.frequencia < 70 ? 700 : 400 }}>{a.frequencia}%</td>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <div style={{ width:60, height:6, background:'#E2E8F0', borderRadius:99 }}>
-                          <div style={{ width:`${a.pontuacao_risco}%`, height:'100%', borderRadius:99, background: a.pontuacao_risco>=76?'#EF4444':a.pontuacao_risco>=51?'#F97316':a.pontuacao_risco>=26?'#EAB308':'#22C55E' }} />
-                        </div>
-                        <span style={{ fontSize:'.78rem', fontFamily:'Roboto Mono,monospace', fontWeight:600 }}>{a.pontuacao_risco}</span>
-                      </div>
-                    </td>
-                    <td><span className={`badge ${b.cls}`}>{b.label}</span></td>
-                    <td style={{ fontFamily:'Roboto Mono,monospace', fontSize:'.82rem', color: a.prob_reprovacao > 50 ? 'var(--red)' : 'inherit' }}>{a.prob_reprovacao}%</td>
-                    <td style={{ fontFamily:'Roboto Mono,monospace', fontSize:'.82rem', color:'var(--blue-light)', fontWeight:600 }}>{a.previsao != null ? a.previsao.toFixed(1) : '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPags > 1 && (
-          <div className="pagination">
-            <button className="page-btn" onClick={() => setPagina(p => p - 1)} disabled={pagina === 1}>‹</button>
-            {Array.from({ length: totalPags }, (_, i) => (
-              <button key={i+1} className={`page-btn${pagina===i+1?' active':''}`} onClick={() => setPagina(i+1)}>{i+1}</button>
-            ))}
-            <button className="page-btn" onClick={() => setPagina(p => p + 1)} disabled={pagina === totalPags}>›</button>
-          </div>
-        )}
-
-        <InsightCard icon="🎯" text={`IRC (Índice de Risco Combinado) calculado pelo backend com base na nota média e frequência estimada. Scores acima de 75 indicam risco crítico. Probabilidade de reprovação calculada por regressão logística.`} />
-      </div>
     </div>
-  );
+  `;
+
+  // ─── Renderiza gráficos ────────────────────────────────────
+  await renderCharts(data);
+
+  // ─── Tooltip do Detalhamento ──────────────────────────────
+  const detHelp    = container.querySelector('#btn-det-help');
+  const detTooltip = container.querySelector('#det-tooltip');
+  detHelp?.addEventListener('click', e => {
+    e.stopPropagation();
+    const show = detTooltip.style.display === 'none';
+    detTooltip.style.display = show ? 'block' : 'none';
+  });
+  document.addEventListener('click', () => {
+    if (detTooltip) detTooltip.style.display = 'none';
+  });
+
+  // ─── Tooltips dos gráficos ────────────────────────────────
+  container.querySelectorAll('.chart-tooltip-btn').forEach(btn => {
+    const key     = btn.dataset.chart;
+    const popup   = btn.nextElementSibling;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const show = popup.style.display === 'none';
+      container.querySelectorAll('.tooltip-popup').forEach(p => p.style.display = 'none');
+      popup.style.display = show ? 'block' : 'none';
+    });
+  });
+  document.addEventListener('click', () => {
+    container.querySelectorAll('.tooltip-popup').forEach(p => p.style.display = 'none');
+  });
+
+  // ─── Filtro simples ───────────────────────────────────────
+  container.querySelector('#btn-apply-filters')?.addEventListener('click', () => {
+    const cursoId   = container.querySelector('#pred-curso')?.value;
+    const materiaId = container.querySelector('#pred-materia')?.value;
+    state.setFilter('cursoId',   cursoId   || null);
+    state.setFilter('materiaId', materiaId || null);
+
+    // Atualiza registro count
+    let total = MOCK_DATA.estatisticas.registros.total;
+    if (cursoId) {
+      const turmasDoCurso = MOCK_DATA.turmas.filter(t => t.cursoId === cursoId);
+      total = turmasDoCurso.reduce((s, t) => s + t.alunos, 0);
+    }
+    const countEl = container.querySelector('#stat-count-num');
+    if (countEl) countEl.textContent = total.toLocaleString('pt-BR');
+  });
+
+  // ─── Detalhamento (FilterPanel) ───────────────────────────
+  container.querySelector('#btn-detalhamento')?.addEventListener('click', () => {
+    openFilterPanel(filters => {
+      // Aqui atualizaria os gráficos com os filtros aplicados
+      console.log('Filtros avançados aplicados:', filters);
+    });
+  });
+
+  // ─── Resize dos charts com sidebar ────────────────────────
+  return () => {
+    Object.values(_charts).forEach(c => c?.destroy?.());
+    _charts = {};
+  };
 }
 
-window.Predicao = Predicao;
+// ─── Helper: HTML de um chart card ────────────────────────────
+function makeChartCard(id, title, subtitle, tooltipKey) {
+  const tt = TOOLTIPS[tooltipKey];
+  return `
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">${title}</div>
+          <div class="chart-subtitle">${subtitle}</div>
+        </div>
+        <div style="position:relative;flex-shrink:0;">
+          <button class="tooltip-btn chart-tooltip-btn" data-chart="${tooltipKey}"
+                  aria-label="Saiba mais sobre ${title}">?</button>
+          <div class="tooltip-popup" style="display:none;">
+            <strong>${tt.titulo}</strong><br/><br/>
+            ${tt.texto.replace(/\n/g, '<br/>')}
+          </div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="${id}"></canvas>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Helper: Stat count card ──────────────────────────────────
+function makeStatCountCard(registros) {
+  return `
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Registros Analisados</div>
+          <div class="chart-subtitle">Dinâmico conforme filtro ativo</div>
+        </div>
+        <div style="position:relative;flex-shrink:0;">
+          <button class="tooltip-btn chart-tooltip-btn" data-chart="registros"
+                  aria-label="Saiba mais">?</button>
+          <div class="tooltip-popup" style="display:none;">
+            <strong>${TOOLTIPS.registros.titulo}</strong><br/><br/>
+            ${TOOLTIPS.registros.texto.replace(/\n/g, '<br/>')}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-top:12px;">
+        <div class="stat-count-card">
+          <div class="stat-count-num" id="stat-count-num">${registros.total.toLocaleString('pt-BR')}</div>
+          <div class="stat-count-label">Total de Registros Ativos</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="background:var(--bg-page);border-radius:8px;padding:12px;text-align:center;border:1px solid var(--border-color);">
+            <div style="font-family:'Montserrat',sans-serif;font-size:1.4rem;font-weight:800;color:var(--blue-primary);">${registros.filtrado.toLocaleString('pt-BR')}</div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">Filtro Atual</div>
+          </div>
+          <div style="background:var(--bg-page);border-radius:8px;padding:12px;text-align:center;border:1px solid var(--border-color);">
+            <div style="font-family:'Montserrat',sans-serif;font-size:1.4rem;font-weight:800;color:var(--green);">${registros.periodos.length}</div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">Períodos</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Distribuição por Período</div>
+          ${registros.periodos.map((p, i) => {
+            const pct = Math.round((registros.porPeriodo[i] / registros.total) * 100);
+            return `
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                <span style="font-size:.72rem;color:var(--text-muted);min-width:50px;">${p}</span>
+                <div style="flex:1;height:6px;background:var(--border-color);border-radius:99px;overflow:hidden;">
+                  <div style="width:${pct}%;height:100%;background:var(--blue-primary);border-radius:99px;"></div>
+                </div>
+                <span style="font-size:.72rem;color:var(--text-muted);min-width:35px;">${registros.porPeriodo[i].toLocaleString('pt-BR')}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Renderização dos Chart.js ─────────────────────────────────
+async function renderCharts(data) {
+  // Espera Chart.js estar disponível
+  if (typeof Chart === 'undefined') return;
+
+  const BLUE    = '#3AADE5';
+  const DARK    = '#0B4F7C';
+  const GREEN   = '#22C55E';
+  const YELLOW  = '#EAB308';
+  const ORANGE  = '#F97316';
+  const RED     = '#EF4444';
+  const PURPLE  = '#8B5CF6';
+
+  const defaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { font: { family: 'Inter', size: 11 }, color: '#64748B' } } },
+  };
+
+  // 1. Regressão — Scatter
+  const ctxReg = document.getElementById('chart-regressao');
+  if (ctxReg) {
+    _charts.regressao?.destroy();
+    _charts.regressao = new Chart(ctxReg, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'Alunos',
+            data: data.regressao.pontos,
+            backgroundColor: `${BLUE}88`,
+            borderColor: BLUE,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+          },
+          {
+            label: 'Linha de Tendência',
+            data: data.regressao.linha,
+            type: 'line',
+            borderColor: RED,
+            borderWidth: 2,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false,
+          },
+        ],
+      },
+      options: {
+        ...defaults,
+        scales: {
+          x: { title: { display: true, text: 'Semana', color: '#64748B', font: { size: 11 } } },
+          y: { title: { display: true, text: 'Nota', color: '#64748B', font: { size: 11 } }, min: 0, max: 10 },
+        },
+        plugins: {
+          ...defaults.plugins,
+          annotation: {},
+        },
+      },
+    });
+  }
+
+  // 2. Variância — Barras + linha de referência
+  const ctxVar = document.getElementById('chart-variancia');
+  if (ctxVar) {
+    _charts.variancia?.destroy();
+    _charts.variancia = new Chart(ctxVar, {
+      type: 'bar',
+      data: {
+        labels: data.variancia.labels,
+        datasets: [
+          {
+            label: 'Variância',
+            data: data.variancia.valores,
+            backgroundColor: [BLUE, GREEN, YELLOW, ORANGE, PURPLE].map(c => `${c}99`),
+            borderColor:     [BLUE, GREEN, YELLOW, ORANGE, PURPLE],
+            borderWidth: 2, borderRadius: 6,
+          },
+          {
+            label: `Média (${data.variancia.media})`,
+            data: Array(data.variancia.labels.length).fill(data.variancia.media),
+            type: 'line', borderColor: RED, borderWidth: 2,
+            borderDash: [5, 3], pointRadius: 0, fill: false,
+          },
+        ],
+      },
+      options: {
+        ...defaults,
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Variância', color: '#64748B', font: { size: 11 } } },
+        },
+      },
+    });
+  }
+
+  // 3. Média e Mediana — Barras agrupadas
+  const ctxMed = document.getElementById('chart-media');
+  if (ctxMed) {
+    _charts.mediaMediana?.destroy();
+    _charts.mediaMediana = new Chart(ctxMed, {
+      type: 'bar',
+      data: {
+        labels: data.mediaMediana.labels,
+        datasets: [
+          {
+            label: 'Média',
+            data: data.mediaMediana.medias,
+            backgroundColor: `${BLUE}BB`, borderColor: BLUE,
+            borderWidth: 2, borderRadius: 6,
+          },
+          {
+            label: 'Mediana',
+            data: data.mediaMediana.medianas,
+            backgroundColor: `${GREEN}BB`, borderColor: GREEN,
+            borderWidth: 2, borderRadius: 6,
+          },
+        ],
+      },
+      options: {
+        ...defaults,
+        scales: {
+          y: { min: 0, max: 10,
+            title: { display: true, text: 'Nota', color: '#64748B', font: { size: 11 } } },
+        },
+      },
+    });
+  }
+
+  // 4. Homogeneidade — Radar
+  const ctxHom = document.getElementById('chart-homog');
+  if (ctxHom) {
+    _charts.homogeneidade?.destroy();
+    _charts.homogeneidade = new Chart(ctxHom, {
+      type: 'radar',
+      data: {
+        labels: data.homogeneidade.labels,
+        datasets: [{
+          label: 'Índice de Homogeneidade (%)',
+          data: data.homogeneidade.valores,
+          backgroundColor: `${BLUE}33`,
+          borderColor: BLUE, borderWidth: 2,
+          pointBackgroundColor: BLUE, pointRadius: 4,
+        }],
+      },
+      options: {
+        ...defaults,
+        scales: {
+          r: {
+            min: 0, max: 100,
+            ticks: { color: '#64748B', font: { size: 10 } },
+            grid: { color: '#E2E8F0' },
+            pointLabels: { color: '#1E293B', font: { size: 10, family: 'Inter' } },
+          },
+        },
+      },
+    });
+  }
+
+  // 5. Desvio Padrão — Barras horizontais
+  const ctxDp = document.getElementById('chart-dp');
+  if (ctxDp) {
+    _charts.desvioPadrao?.destroy();
+    _charts.desvioPadrao = new Chart(ctxDp, {
+      type: 'bar',
+      data: {
+        labels: data.desvioPadrao.labels,
+        datasets: [{
+          label: 'Desvio Padrão',
+          data: data.desvioPadrao.valores,
+          backgroundColor: data.desvioPadrao.valores.map(v =>
+            v > 2 ? `${RED}99` : v > 1.5 ? `${YELLOW}99` : `${GREEN}99`
+          ),
+          borderColor: data.desvioPadrao.valores.map(v =>
+            v > 2 ? RED : v > 1.5 ? YELLOW : GREEN
+          ),
+          borderWidth: 2, borderRadius: 6,
+        }],
+      },
+      options: {
+        ...defaults,
+        indexAxis: 'y',
+        scales: {
+          x: { beginAtZero: true,
+            title: { display: true, text: 'Desvio Padrão (σ)', color: '#64748B', font: { size: 11 } } },
+        },
+      },
+    });
+  }
+}

@@ -1,108 +1,129 @@
 /**
- * api.js — Camada de serviço com cache em memória
- * Mapeia os endpoints reais do backend FastAPI (main.py)
+ * api.js — Predicta
+ * Placeholders de integração com o back-end FastAPI.
+ * Atualmente retorna dados do mockData.js.
  *
- * Endpoints disponíveis:
- *   GET /alunos/todos          → lista de alunos únicos
- *   GET /registros/{id}        → boletim de um aluno (VA1, VA2, VA3 em escala 0-100)
- *   GET /estatisticas/gerais   → total de registros + contagem por situação
- *   GET /estatisticas/avancadas → quartis, DP, homogeneidade, KPIs
- *   GET /predicao/{id}         → predição individual (IRC, score, tendência)
+ * TODO (futura integração): Substituir cada função pela chamada Fetch/Axios real.
+ * Rotas FastAPI documentadas nos comentários.
  */
 
-const API = {
-  _cache: new Map(),
+import { MOCK_DATA } from './mockData.js';
+import { state }     from './state.js';
 
-  /** Executa fetch com cache em memória para evitar requisições duplicadas */
-  async _cached(key, fetcher) {
-    if (this._cache.has(key)) return this._cache.get(key);
-    const promise = fetcher();
-    this._cache.set(key, promise); // salva a promise (não o resultado) para evitar race conditions
-    return promise;
-  },
+const BASE_URL = 'http://localhost:8000'; // FastAPI server
 
-  async _fetch(url) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      console.warn(`[API] Falha em ${url}:`, e.message);
-      return null;
-    }
-  },
+/** Helper de fetch com tratamento de erro */
+async function apiFetch(path, opts = {}) {
+  // TODO: remover comentário e ativar quando back-end estiver disponível
+  // const res = await fetch(`${BASE_URL}${path}`, {
+  //   headers: { 'Content-Type': 'application/json', ...opts.headers },
+  //   ...opts,
+  // });
+  // if (!res.ok) throw new Error(`API Error: ${res.status}`);
+  // return res.json();
+  throw new Error('API não conectada — usando mockData');
+}
 
-  // ── Estatísticas ─────────────────────────────────────────────────────────
-
-  async getEstatisticasAvancadas() {
-    return this._cached('stats_avancadas', async () => {
-      const d = await this._fetch('/estatisticas/avancadas');
-      return d; // retorna null se falhar — componentes tratam
-    });
-  },
-
-  async getEstatisticasGerais() {
-    return this._cached('stats_gerais', async () => {
-      return await this._fetch('/estatisticas/gerais');
-    });
-  },
-
-  // ── Alunos ────────────────────────────────────────────────────────────────
-
-  async getAlunos() {
-    return this._cached('alunos', async () => {
-      return await this._fetch('/alunos/todos');
-    });
-  },
-
-  // ── Boletins ─────────────────────────────────────────────────────────────
-
-  async getBoletimAluno(id) {
-    return this._cached(`boletim_${id}`, async () => {
-      return await this._fetch(`/registros/${id}`);
-    });
-  },
-
-  /**
-   * Carrega boletins de TODOS os alunos em paralelo.
-   * Retorna array de { id_aluno, boletim: [RegistroAcademico] }
-   */
-  async getAllBoletins() {
-    return this._cached('all_boletins', async () => {
-      const alunos = await this.getAlunos();
-      if (!alunos) return [];
-      const ids = [...new Set(alunos.map(a => String(a.ID_ALUNO)))];
-      const results = await Promise.all(ids.map(id => this.getBoletimAluno(id)));
-      return results.filter(r => r && r.boletim && r.boletim.length > 0);
-    });
-  },
-
-  // ── Predição ──────────────────────────────────────────────────────────────
-
-  async getPredicaoAluno(id) {
-    return this._cached(`predicao_${id}`, async () => {
-      return await this._fetch(`/predicao/${id}`);
-    });
-  },
-
-  /**
-   * Carrega predições de todos os alunos em paralelo.
-   * Retorna array de resultados do endpoint /predicao/{id}
-   */
-  async getAllPredictions() {
-    return this._cached('all_predictions', async () => {
-      const alunos = await this.getAlunos();
-      if (!alunos) return [];
-      const ids = [...new Set(alunos.map(a => String(a.ID_ALUNO)))];
-      const results = await Promise.all(ids.map(id => this.getPredicaoAluno(id)));
-      return results.filter(Boolean);
-    });
-  },
-
-  /** Limpa o cache (útil para botão de refresh) */
-  clearCache() {
-    this._cache.clear();
+/* ──────────────────────────────────────────────────────────────
+   ALUNOS
+   GET /alunos/todos          → lista completa de alunos
+   GET /alunos/{id}           → aluno individual
+   GET /alunos/turma/{id}     → alunos de uma turma
+────────────────────────────────────────────────────────────── */
+export async function getAlunos(turmaId = null) {
+  try {
+    return await apiFetch(turmaId ? `/alunos/turma/${turmaId}` : '/alunos/todos');
+  } catch {
+    return state.getAlunos(turmaId);
   }
-};
+}
 
-window.API = API;
+/* ──────────────────────────────────────────────────────────────
+   CURSOS
+   GET /cursos/todos          → lista de cursos
+   GET /cursos/{id}/turmas    → turmas de um curso
+────────────────────────────────────────────────────────────── */
+export async function getCursos() {
+  try {
+    return await apiFetch('/cursos/todos');
+  } catch {
+    return state.getCursos();
+  }
+}
+
+export async function getTurmas(cursoId = null) {
+  try {
+    return await apiFetch(cursoId ? `/cursos/${cursoId}/turmas` : '/turmas/todas');
+  } catch {
+    return state.getTurmas(cursoId);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   ESTATÍSTICAS E KPIs
+   GET /estatisticas/gerais   → KPIs globais
+   GET /estatisticas/avancadas → dados para gráficos
+────────────────────────────────────────────────────────────── */
+export async function getKpis() {
+  try {
+    return await apiFetch('/estatisticas/gerais');
+  } catch {
+    return state.getKpis();
+  }
+}
+
+export async function getEstatisticas(filters = {}) {
+  try {
+    const params = new URLSearchParams(filters);
+    return await apiFetch(`/estatisticas/avancadas?${params}`);
+  } catch {
+    return MOCK_DATA.estatisticas;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   PREDIÇÃO
+   GET /predicao/{alunoId}    → índice de risco de um aluno
+   POST /predicao/batch       → predicão em batch
+────────────────────────────────────────────────────────────── */
+export async function getPredicao(alunoId) {
+  try {
+    return await apiFetch(`/predicao/${alunoId}`);
+  } catch {
+    const aluno = MOCK_DATA.alunos.find(a => a.id === alunoId);
+    return { risco: aluno?.risco || 'baixo', irc: Math.random() * 100 };
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   AUTENTICAÇÃO (placeholder)
+   POST /auth/login           → { token, perfil }
+   POST /auth/logout          → {}
+────────────────────────────────────────────────────────────── */
+export async function login(cpf, senha) {
+  // TODO: implementar autenticação real
+  // return apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ cpf, senha }) });
+  console.warn('Login fictício — back-end desacoplado');
+  return { ok: true, perfil: state.getPerfil() };
+}
+
+export async function logout() {
+  // TODO: chamar POST /auth/logout e limpar token
+  console.warn('Logout fictício');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   LYCEUM (sincronização)
+   POST /lyceum/sync          → inicia sincronização de dados
+   GET  /lyceum/status        → { lastSync, status }
+────────────────────────────────────────────────────────────── */
+export async function syncLyceum() {
+  try {
+    return await apiFetch('/lyceum/sync', { method: 'POST' });
+  } catch {
+    // Simula sincronização com delay
+    return new Promise(resolve =>
+      setTimeout(() => resolve({ ok: true, sincronizados: 2847, dataHora: new Date().toISOString() }), 2500)
+    );
+  }
+}

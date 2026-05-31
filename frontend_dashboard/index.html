@@ -1,55 +1,114 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Predicta — Sistema Inteligente de Monitoramento e Predição Acadêmica. Acompanhe indicadores institucionais, predições e estatísticas em tempo real." />
+  <meta name="robots" content="noindex, nofollow" />
   <title>Predicta — SIMPA | Monitoramento Acadêmico</title>
+
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Design System -->
   <link rel="stylesheet" href="/assets/styles.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <div id="root">
-    <div class="splash-screen" id="splash">
-      <div class="splash-content">
-        <img src="/assets/Simbolo - (SEM FUNDO).png" alt="Predicta" class="splash-symbol"
-             onerror="this.style.display='none'" />
-        <div class="splash-bar"><div class="splash-bar-fill"></div></div>
-        <p class="splash-text">Carregando Predicta...</p>
-      </div>
+
+  <!-- ───── SPLASH SCREEN ───── -->
+  <div class="splash-screen" id="splash">
+    <div class="splash-content">
+      <img src="/assets/Simbolo - (SEM FUNDO).png" alt="Predicta" class="splash-symbol"
+           onerror="this.style.display='none'" />
+      <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+      <p class="splash-text">Carregando Predicta...</p>
     </div>
   </div>
 
-  <!-- React 18 -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Babel (transpila JSX no browser) -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- ───── APP SHELL ───── -->
+  <div class="app-shell" id="app-shell" style="display:none;">
 
-  <!-- Serviços e utilitários -->
-  <script type="text/babel" src="/assets/js/api.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/utils.js?v=2"></script>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Logo area -->
+      <div class="sidebar-logo-area">
+        <img src="/assets/Logo - (SEM FUNDO) (1).png" alt="Predicta" class="sidebar-logo-full"
+             onerror="this.style.display='none'" />
+        <img src="/assets/Simbolo - (SEM FUNDO).png" alt="Predicta" class="sidebar-logo-symbol"
+             onerror="this.style.display='none'" />
+      </div>
 
-  <!-- Componentes base -->
-  <script type="text/babel" src="/assets/js/components/Sidebar.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/components/Header.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/components/KpiCard.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/components/LoadingState.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/components/EmptyState.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/components/InsightCard.js?v=2"></script>
+      <!-- Navigation -->
+      <nav class="sidebar-nav" id="sidebar-nav" aria-label="Navegação principal"></nav>
 
-  <!-- Páginas -->
-  <script type="text/babel" src="/assets/js/pages/Dashboard.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/pages/Cursos.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/pages/Predicao.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/pages/Notas.js?v=2"></script>
-  <script type="text/babel" src="/assets/js/pages/Estatisticas.js?v=2"></script>
+      <!-- Footer with toggle -->
+      <div class="sidebar-footer">
+        <div class="sidebar-perfil" id="sidebar-perfil"></div>
+      </div>
 
-  <!-- App principal -->
-  <script type="text/babel" src="/assets/js/App.js?v=2"></script>
+      <!-- Toggle button (pill on edge) -->
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Retrair/Expandir sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- Main content -->
+    <div class="main-content" id="main-content">
+      <!-- Saudação dinâmica (top left) -->
+      <div class="greeting-bar" id="greeting-bar">
+        <div>
+          <h1 class="greeting-title" id="greeting-title">Carregando...</h1>
+          <p class="greeting-sub" id="greeting-sub">Resumo preditivo das suas turmas e alertas de alunos.</p>
+        </div>
+        <div class="greeting-period" id="greeting-period"></div>
+      </div>
+
+      <!-- Page content -->
+      <main class="page-content" id="page-content" role="main" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <!-- ───── FLOATING ACTIONS (fixed top-right) ───── -->
+  <div class="floating-actions" id="floating-actions" style="display:none;">
+    <!-- Notificações -->
+    <div class="float-btn-wrap">
+      <button class="float-btn" id="btn-notif" aria-label="Notificações">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span class="float-badge" id="notif-badge" style="display:none;"></span>
+      </button>
+      <!-- Dropdown notificações -->
+      <div class="notif-dropdown" id="notif-dropdown" style="display:none;"></div>
+    </div>
+
+    <!-- Perfil / Configurações -->
+    <button class="float-btn float-btn-avatar" id="btn-profile" aria-label="Perfil e configurações">
+      <span id="float-avatar-text">SK</span>
+    </button>
+
+    <!-- FAQ -->
+    <button class="float-btn float-btn-faq" id="btn-faq" aria-label="Perguntas frequentes">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ───── MODAL ROOT ───── -->
+  <div id="modal-root"></div>
+
+  <!-- ───── ENTRY POINT (ES6 modules) ───── -->
+  <script type="module" src="/assets/js/App.js"></script>
 </body>
 </html>

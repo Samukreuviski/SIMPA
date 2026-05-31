@@ -1,158 +1,312 @@
-/** Cursos.js — Cursos agrupados a partir dos dados reais de /alunos/todos */
-const { useState: useStateC, useEffect: useEffectC, useRef: useRefC } = React;
+/**
+ * Cursos.js — Predicta
+ * Navegação em cascata: Cursos → Turmas → Alunos
+ * Botão proeminente "Conectar ao Lyceum"
+ */
 
-function CourseCard({ nomeCurso, alunos }) {
-  const [expanded, setExpanded] = useStateC(false);
-  const barRef  = useRefC(null);
-  const barInst = useRefC(null);
+import { state }                 from '../state.js';
+import { getRiscoBadge, fmtNum, fmtNota, fmtPct } from '../utils.js';
+import { openInterventionModal } from '../components/InterventionModal.js';
+import { syncLyceum }            from '../api.js';
+import { showToast }             from '../components/Modal.js';
 
-  // Agrupa alunos por situação
-  const situacoes = alunos.reduce((acc, a) => {
-    const s = a.SITUAÇÃO || 'Cursando';
-    acc[s] = (acc[s] || 0) + 1;
-    return acc;
-  }, {});
-  const total      = alunos.length;
-  const aprovados  = situacoes['Aprovado'] || 0;
-  const reprovados = (situacoes['Reprovado'] || 0) + (situacoes['Reprovado por Falta'] || 0);
-  const cursando   = situacoes['Cursando'] || 0;
-  const taxaAprov  = total > 0 ? Math.round((aprovados / total) * 100) : 0;
+let _currentCursoId = null;
+let _currentTurmaId = null;
 
-  // Gráfico de barras das situações
-  useEffectC(() => {
-    if (!expanded || !barRef.current) return;
-    if (barInst.current) barInst.current.destroy();
-    const labels = Object.keys(situacoes);
-    const values = Object.values(situacoes);
-    const colors = labels.map(l => {
-      if (l === 'Aprovado') return '#22C55E';
-      if (l === 'Reprovado') return '#EF4444';
-      if (l === 'Reprovado por Falta') return '#F97316';
-      return '#3AADE5';
-    });
-    barInst.current = new Chart(barRef.current, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{ label: 'Alunos', data: values, backgroundColor: colors, borderRadius: 6 }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { beginAtZero: true, grid: { color: '#E2E8F0' }, ticks: { precision: 0 } },
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
-        },
-        animation: { duration: 400 }
-      }
-    });
-    return () => { if (barInst.current) barInst.current.destroy(); };
-  }, [expanded]);
+export async function renderCursos(container) {
+  _currentCursoId = null;
+  _currentTurmaId = null;
 
-  return (
-    <div className="course-card">
-      <div className="course-card-header">
-        <div className="course-name">{nomeCurso}</div>
-        <div className="course-coord" style={{ marginTop: 4, opacity: .8, fontSize: '.78rem' }}>📚 {total} alunos cadastrados</div>
-      </div>
-      <div className="course-card-body">
-        <div className="course-stats">
-          <div className="course-stat">
-            <div className="cs-val">{total}</div>
-            <div className="cs-label">Total</div>
+  // Reset period label
+  const periodoEl = document.getElementById('greeting-period');
+  if (periodoEl) periodoEl.innerHTML = '';
+
+  renderCursosList(container);
+}
+
+// ── NÍVEL 1: Lista de Cursos ──────────────────────────────────
+function renderCursosList(container) {
+  const cursos = state.getCursos();
+
+  container.innerHTML = `
+    <div class="page-fade-in">
+
+      <!-- Botão Lyceum (hero) -->
+      <div style="background:linear-gradient(135deg,var(--blue-dark),var(--blue-deep));
+          border-radius:var(--radius);padding:28px 32px;margin-bottom:28px;
+          display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
+          box-shadow:var(--shadow-lg);">
+        <div>
+          <div style="color:rgba(255,255,255,.65);font-size:.8rem;font-weight:600;
+              text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">
+            🔗 Integração Institucional
           </div>
-          <div className="course-stat">
-            <div className="cs-val" style={{ color: 'var(--green)' }}>{aprovados}</div>
-            <div className="cs-label">Aprovados</div>
+          <div style="color:#fff;font-size:1.2rem;font-weight:800;margin-bottom:6px;">
+            Portal Académico Lyceum
           </div>
-          <div className="course-stat">
-            <div className="cs-val" style={{ color: 'var(--red)' }}>{reprovados}</div>
-            <div className="cs-label">Reprovados</div>
-          </div>
-          <div className="course-stat">
-            <div className="cs-val" style={{ color: 'var(--blue-light)' }}>{taxaAprov}%</div>
-            <div className="cs-label">Aprovação</div>
+          <div style="color:rgba(255,255,255,.65);font-size:.85rem;max-width:460px;">
+            Sincronize matrícula, notas e frequência diretamente do sistema acadêmico da UniEVANGÉLICA.
+            Última sincronização: <strong style="color:rgba(255,255,255,.85);">há 5 dias</strong>
           </div>
         </div>
-
-        <button
-          onClick={() => setExpanded(e => !e)}
-          id={`expand-course-${nomeCurso.replace(/\s/g, '-')}`}
-          style={{ width:'100%', padding:'8px', background:'var(--gray-bg)', border:'1px solid var(--gray-border)', borderRadius:6, cursor:'pointer', fontSize:'.82rem', color:'var(--blue-dark)', fontWeight:600, transition:'background .2s' }}
-        >
-          {expanded ? '▲ Ocultar gráfico' : '▼ Ver distribuição de situações'}
+        <button class="btn-lyceum" id="btn-lyceum" type="button">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 .49-4.49"/>
+          </svg>
+          Conectar ao Lyceum
         </button>
+      </div>
 
-        {expanded && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ height: 180 }}>
-              <canvas ref={barRef} id={`chart-${nomeCurso.replace(/\s/g, '-')}`} />
+      <!-- Breadcrumb -->
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="breadcrumb-current">Cursos</span>
+      </div>
+
+      <!-- Header -->
+      <div class="section-header">
+        <div class="section-title">
+          📚 Cursos Disponíveis
+          <span class="section-badge">${cursos.length}</span>
+        </div>
+      </div>
+
+      <!-- Grid de cursos -->
+      <div class="cursos-grid" id="cursos-grid">
+        ${cursos.map(c => `
+          <div class="curso-card risco-${c.risco}" data-curso="${c.id}" tabindex="0" role="button">
+            <div class="curso-card-codigo">${c.codigo} · ${c.id}</div>
+            <div class="curso-card-nome">${c.nome}</div>
+            <div class="curso-card-stats">
+              <div class="curso-stat">
+                <span class="curso-stat-val">${fmtNum(c.alunos)}</span>
+                <span class="curso-stat-label">Alunos</span>
+              </div>
+              <div class="curso-stat">
+                <span class="curso-stat-val">${c.turmas}</span>
+                <span class="curso-stat-label">Turmas</span>
+              </div>
             </div>
-            <div style={{ marginTop: 12, display:'flex', flexWrap:'wrap', gap:8 }}>
-              {Object.entries(situacoes).map(([sit, cnt]) => {
-                const b = Utils.situacaoBadge(sit);
-                return (
-                  <div key={sit} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 12px', background:'var(--gray-bg)', borderRadius:6, border:'1px solid var(--gray-border)', flex:'1', minWidth:120 }}>
-                    <span className={`badge ${b.cls}`}>{b.label}</span>
-                    <span style={{ fontFamily:'Roboto Mono,monospace', fontWeight:700, fontSize:'.9rem' }}>{cnt}</span>
-                  </div>
-                );
-              })}
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              ${getRiscoBadge(c.risco)}
+              <span style="font-size:.78rem;color:var(--blue-primary);font-weight:600;">
+                Ver turmas →
+              </span>
             </div>
           </div>
-        )}
+        `).join('')}
       </div>
     </div>
-  );
+  `;
+
+  // ─── Lyceum sync ──────────────────────────────────────────
+  const btnLyceum = container.querySelector('#btn-lyceum');
+  btnLyceum?.addEventListener('click', async () => {
+    btnLyceum.disabled = true;
+    btnLyceum.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" style="animation:spin 1s linear infinite;">
+        <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+      </svg>
+      Sincronizando...
+    `;
+    try {
+      const res = await syncLyceum();
+      showToast(`✅ Lyceum sincronizado! ${fmtNum(res.sincronizados)} registros atualizados.`, 'success', 4000);
+    } catch {
+      showToast('❌ Falha na sincronização. Tente novamente.', 'error');
+    }
+    btnLyceum.disabled = false;
+    btnLyceum.innerHTML = `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="1 4 1 10 7 10"/>
+        <path d="M3.51 15a9 9 0 1 0 .49-4.49"/>
+      </svg>
+      Conectar ao Lyceum
+    `;
+  });
+
+  // ─── Clique no curso → turmas ─────────────────────────────
+  container.querySelectorAll('.curso-card').forEach(card => {
+    card.addEventListener('click', () => {
+      _currentCursoId = card.dataset.curso;
+      renderTurmasList(container, _currentCursoId);
+    });
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') card.click();
+    });
+  });
 }
 
-function Cursos() {
-  const [cursos,  setCursos]  = useStateC({});
-  const [loading, setLoading] = useStateC(true);
-  const [erro,    setErro]    = useStateC(false);
+// ── NÍVEL 2: Lista de Turmas ──────────────────────────────────
+function renderTurmasList(container, cursoId) {
+  const curso  = state.getCursos().find(c => c.id === cursoId);
+  const turmas = state.getTurmas(cursoId);
 
-  useEffectC(() => {
-    API.getAlunos().then(alunos => {
-      if (!alunos) { setErro(true); setLoading(false); return; }
-      // Agrupa por NOME_CURSO
-      const map = {};
-      alunos.forEach(a => {
-        const curso = a.NOME_CURSO || 'Curso não informado';
-        if (!map[curso]) map[curso] = [];
-        map[curso].push(a);
-      });
-      setCursos(map);
-      setLoading(false);
-    }).catch(() => { setErro(true); setLoading(false); });
-  }, []);
-
-  if (loading) return <LoadingState type="page" />;
-  if (erro) return <EmptyState title="Erro ao carregar cursos" desc="Verifique se o servidor está rodando." onRetry={() => location.reload()} />;
-
-  const cursoNomes = Object.keys(cursos).sort();
-
-  return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Cursos</h1>
-        <p className="page-subtitle">Visão consolidada por curso — dados reais do banco acadêmico.</p>
+  container.innerHTML = `
+    <div class="page-fade-in">
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="breadcrumb-item" id="bc-cursos">Cursos</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">${curso?.nome}</span>
       </div>
 
-      {cursoNomes.length === 0 ? (
-        <EmptyState title="Nenhum curso encontrado" desc="Não há dados de cursos disponíveis na API." />
-      ) : (
-        <div className="courses-grid">
-          {cursoNomes.map(nome => (
-            <CourseCard key={nome} nomeCurso={nome} alunos={cursos[nome]} />
-          ))}
+      <div class="section-header">
+        <div class="section-title">
+          🏫 Turmas — ${curso?.nome}
+          <span class="section-badge">${turmas.length}</span>
         </div>
-      )}
+        <button class="btn btn-outline btn-sm" id="bc-cursos-btn">← Voltar</button>
+      </div>
 
-      <div className="section-card" style={{ marginTop: 20 }}>
-        <InsightCard icon="📊" text={`${cursoNomes.length} curso(s) encontrado(s) no banco de dados. Expanda cada card para ver a distribuição de situações por curso.`} />
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">
+        ${turmas.map(t => `
+          <div class="turma-card ${t.risco === 'alto' ? 'risco-alto' : t.risco === 'medio' ? 'risco-medio' : 'risco-baixo'}"
+               data-turma="${t.id}" style="cursor:pointer;" tabindex="0" role="button">
+            <div class="turma-card-header">
+              <div>
+                <div class="turma-card-nome">${t.nome}</div>
+                <div class="turma-card-serie">${t.serie} · ${t.professor}</div>
+              </div>
+              ${getRiscoBadge(t.risco)}
+            </div>
+            <div class="turma-card-stats">
+              <div class="turma-stat">
+                <span class="turma-stat-val">${fmtNum(t.alunos)}</span>
+                <span class="turma-stat-label">Alunos</span>
+              </div>
+              <div class="turma-stat">
+                <span class="turma-stat-val" style="color:var(--red);">${fmtNum(t.emRisco)}</span>
+                <span class="turma-stat-label">Em Risco</span>
+              </div>
+              <div class="turma-stat">
+                <span class="turma-stat-val">${fmtNota(t.mediaGeral)}</span>
+                <span class="turma-stat-label">Média</span>
+              </div>
+              <div class="turma-stat">
+                <span class="turma-stat-val">${fmtPct(t.taxaFreq, 0)}</span>
+                <span class="turma-stat-label">Freq.</span>
+              </div>
+            </div>
+            <div style="color:var(--blue-primary);font-size:.78rem;font-weight:600;text-align:right;">
+              Ver alunos →
+            </div>
+          </div>
+        `).join('')}
       </div>
     </div>
-  );
+  `;
+
+  container.querySelector('#bc-cursos')?.addEventListener('click', () => renderCursosList(container));
+  container.querySelector('#bc-cursos-btn')?.addEventListener('click', () => renderCursosList(container));
+
+  container.querySelectorAll('[data-turma]').forEach(card => {
+    card.addEventListener('click', () => {
+      _currentTurmaId = card.dataset.turma;
+      renderAlunosList(container, cursoId, _currentTurmaId);
+    });
+    card.addEventListener('keydown', e => { if (e.key === 'Enter') card.click(); });
+  });
 }
 
-window.Cursos = Cursos;
+// ── NÍVEL 3: Lista de Alunos ──────────────────────────────────
+function renderAlunosList(container, cursoId, turmaId) {
+  const curso  = state.getCursos().find(c => c.id === cursoId);
+  const turma  = state.getTurmas(cursoId).find(t => t.id === turmaId);
+  const alunos = state.getAlunos(turmaId);
+
+  const rows = alunos.map(a => {
+    const media = ((a.va1 + a.va2 + (a.va3 || 0)) / (a.va3 !== 0 ? 3 : 2)).toFixed(1);
+    const mediaNum = parseFloat(media);
+    const mediaClass = mediaNum >= 7 ? 'nota-alta' : mediaNum >= 5 ? 'nota-media' : 'nota-baixa';
+
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:700;color:var(--text);">${a.nome}</div>
+          <div style="font-size:.72rem;color:var(--text-muted);">#${a.id}</div>
+        </td>
+        <td>${a.va1 !== 0 ? fmtNota(a.va1) : '–'}</td>
+        <td>${a.va2 !== 0 ? fmtNota(a.va2) : '–'}</td>
+        <td>${a.va3 !== 0 ? fmtNota(a.va3) : '–'}</td>
+        <td><span class="${mediaClass}">${media}</span></td>
+        <td>${fmtPct(a.frequencia, 0)}</td>
+        <td>${getRiscoBadge(a.risco)}</td>
+        <td>
+          ${a.risco !== 'baixo' ? `
+            <button class="btn-intervene" data-aluno="${a.id}"
+                    style="border:none;cursor:pointer;border-radius:6px;">
+              ✉️ Intervir
+            </button>
+          ` : '—'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="page-fade-in">
+      <div class="breadcrumb">
+        <span class="breadcrumb-item" id="bc-cursos2">Cursos</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-item" id="bc-turmas2">${curso?.nome}</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">${turma?.nome}</span>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">
+          👥 Alunos — ${turma?.nome}
+          <span class="section-badge">${alunos.length}</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" id="bc-turmas-btn">← Voltar</button>
+          ${alunos.some(a => a.risco !== 'baixo') ? `
+            <button class="btn btn-dark btn-sm" id="btn-intervene-all">
+              ✉️ Intervir em Todos em Risco
+            </button>
+          ` : ''}
+        </div>
+      </div>
+
+      <div class="section-card" style="padding:0;overflow:hidden;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Aluno</th>
+                <th>VA1</th><th>VA2</th><th>VA3</th>
+                <th>Média</th>
+                <th>Frequência</th>
+                <th>Status</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  container.querySelector('#bc-cursos2')?.addEventListener('click', () => renderCursosList(container));
+  container.querySelector('#bc-turmas2')?.addEventListener('click', () => renderTurmasList(container, cursoId));
+  container.querySelector('#bc-turmas-btn')?.addEventListener('click', () => renderTurmasList(container, cursoId));
+
+  container.querySelectorAll('.btn-intervene[data-aluno]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const aluno = alunos.find(a => a.id === btn.dataset.aluno);
+      if (aluno) openInterventionModal(aluno, turmaId);
+    });
+  });
+
+  container.querySelector('#btn-intervene-all')?.addEventListener('click', () => {
+    const primeiro = alunos.find(a => a.risco !== 'baixo');
+    if (primeiro) openInterventionModal(primeiro, turmaId);
+  });
+}

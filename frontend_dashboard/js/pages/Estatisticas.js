@@ -1,260 +1,256 @@
-/** Estatisticas.js — Estatísticas com dados reais da API */
-const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
+/**
+ * Estatisticas.js — Predicta
+ * Módulo de estatísticas avançadas com todos os 6 indicadores,
+ * tooltips didáticos e gráficos expandidos.
+ * (Visível apenas para admin e gestao)
+ */
 
-function Estatisticas() {
-  const [stats,   setStats]   = useStateE(null);
-  const [dist,    setDist]    = useStateE(null);  // distribuição real das notas
-  const [turmaStats, setTurmaStats] = useStateE({});
-  const [loading, setLoading] = useStateE(true);
-  const [erro,    setErro]    = useStateE(false);
-  const histRef  = useRefE(null);
-  const boxRef   = useRefE(null);
-  const corrRef  = useRefE(null);
+import { MOCK_DATA } from '../mockData.js';
 
-  useEffectE(() => {
-    Promise.all([
-      API.getEstatisticasAvancadas(),
-      API.getAllBoletins(),
-    ]).then(([adv, boletins]) => {
-      if (!adv) { setErro(true); setLoading(false); return; }
-      setStats(adv);
+export async function renderEstatisticas(container) {
+  const periodoEl = document.getElementById('greeting-period');
+  if (periodoEl) periodoEl.innerHTML = '';
 
-      if (boletins && boletins.length > 0) {
-        // Calcula distribuição real das médias
-        const faixas = Array(10).fill(0);
-        const porTurma = {};
+  container.innerHTML = `
+    <div class="page-fade-in">
 
-        boletins.forEach(b => {
-          b.boletim.forEach(reg => {
-            const m = Utils.calcMedia(reg);
-            const idx = Math.min(Math.floor(m / 10), 9);
-            faixas[idx]++;
-
-            // Agrupa por turma
-            const turma = reg.turma || 'S/T';
-            if (!porTurma[turma]) porTurma[turma] = [];
-            porTurma[turma].push(m);
-          });
-        });
-
-        setDist(faixas);
-        setTurmaStats(porTurma);
-      }
-
-      setLoading(false);
-    }).catch(() => { setErro(true); setLoading(false); });
-  }, []);
-
-  // Histograma com distribuição real
-  useEffectE(() => {
-    if (loading || !histRef.current || !dist) return;
-    if (histRef.current._chart) histRef.current._chart.destroy();
-    const labels = ['0-10','10-20','20-30','30-40','40-50','50-60','60-70','70-80','80-90','90-100'];
-    const c = histRef.current._chart = new Chart(histRef.current, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Nº de Registros',
-          data: dist,
-          backgroundColor: dist.map((_, i) => i < 5 ? '#EF4444' : i === 5 ? '#F97316' : i < 7 ? '#EAB308' : '#22C55E'),
-          borderRadius: 4,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} registros` } } },
-        scales: {
-          y: { grid: { color: '#E2E8F0' }, title: { display: true, text: 'Qtd. de Registros', font: { size: 11 } }, ticks: { precision: 0 } },
-          x: { grid: { display: false }, title: { display: true, text: 'Faixa de Nota', font: { size: 11 } } }
-        }
-      }
-    });
-    return () => c.destroy();
-  }, [loading, dist]);
-
-  // Boxplot por turma (top 6 turmas)
-  useEffectE(() => {
-    if (loading || !boxRef.current || Object.keys(turmaStats).length === 0) return;
-    if (boxRef.current._chart) boxRef.current._chart.destroy();
-
-    // Top 6 turmas com mais registros
-    const topTurmas = Object.entries(turmaStats)
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 6);
-
-    const calcQ = arr => {
-      const s = [...arr].sort((a, b) => a - b);
-      const mid = Math.floor(s.length / 2);
-      const q1 = s[Math.floor(s.length * 0.25)] || 0;
-      const q3 = s[Math.floor(s.length * 0.75)] || 0;
-      const med= s[mid] || 0;
-      return { q1, med, q3 };
-    };
-
-    const boxData = topTurmas.map(([, medias]) => calcQ(medias));
-    const labels  = topTurmas.map(([t]) => `Turma ${t}`);
-
-    const c = boxRef.current._chart = new Chart(boxRef.current, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Q1 → Q3',
-            data: boxData.map(d => d.q3 - d.q1),
-            backgroundColor: 'rgba(58,173,229,.5)',
-            borderRadius: 4,
-            base: boxData.map(d => d.q1),
-          },
-          {
-            label: 'Mediana',
-            data: boxData.map(() => 2),
-            backgroundColor: '#0B4F7C',
-            borderRadius: 0,
-            base: boxData.map(d => d.med - 1),
-          }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { font: { size: 11 }, usePointStyle: true } } },
-        scales: {
-          y: { grid: { color: '#E2E8F0' }, title: { display: true, text: 'Nota', font: { size: 11 } } },
-          x: { grid: { display: false } }
-        }
-      }
-    });
-    return () => c.destroy();
-  }, [loading, turmaStats]);
-
-  // Scatter correlação (usa todos os registros reais)
-  useEffectE(() => {
-    if (loading || !corrRef.current) return;
-    if (corrRef.current._chart) corrRef.current._chart.destroy();
-
-    // Gera pontos de correlação nota × frequência estimada a partir dos dados reais
-    const pontos = [];
-    // Aguarda boletins já carregados no cache
-    API.getAllBoletins().then(boletins => {
-      boletins.forEach(b => {
-        b.boletim.forEach(reg => {
-          const nota = Utils.calcMedia(reg);
-          const freq = Math.round(Math.max(50, Math.min(100, nota * 10 + 20)));
-          pontos.push({ x: freq, y: parseFloat(nota.toFixed(1)) });
-        });
-      });
-
-      if (!corrRef.current) return;
-      if (corrRef.current._chart) corrRef.current._chart.destroy();
-
-      const c = corrRef.current._chart = new Chart(corrRef.current, {
-        type: 'scatter',
-        data: {
-          datasets: [
-            {
-              label: 'Registros (Freq. × Nota)',
-              data: pontos,
-              backgroundColor: 'rgba(58,173,229,.5)',
-              pointRadius: 4,
-            },
-            {
-              label: 'Tendência Linear',
-              data: [{ x: 50, y: 30 }, { x: 100, y: 80 }],
-              type: 'line',
-              borderColor: '#EF4444', borderWidth: 2, borderDash: [5, 4],
-              pointRadius: 0, fill: false,
-            }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { tooltip: { callbacks: { label: ctx => ` Freq: ${ctx.raw.x}% | Nota: ${ctx.raw.y}` } } },
-          scales: {
-            x: { min: 45, max: 105, title: { display: true, text: 'Frequência Estimada (%)', font: { size: 11 } }, grid: { color: '#E2E8F0' } },
-            y: { title: { display: true, text: 'Nota Média', font: { size: 11 } }, grid: { color: '#E2E8F0' } }
-          }
-        }
-      });
-    });
-  }, [loading]);
-
-  if (loading) return <LoadingState type="page" />;
-  if (erro) return <EmptyState title="Erro ao carregar estatísticas" desc="Verifique se o servidor está rodando." onRetry={() => location.reload()} />;
-
-  const q   = stats?.estatisticas_descritivas?.notas_quartis || {};
-  const dp  = stats?.estatisticas_descritivas?.desvio_padrao || 0;
-  const hom = stats?.estatisticas_descritivas?.homogeneidade_turmas || '—';
-  const q1=q.Q1||0, q2=q.Q2||0, q3=q.Q3||0, iqr=q.IQR||0;
-  const variancia = parseFloat((dp * dp).toFixed(2));
-  const cv = dp > 0 && q2 > 0 ? ((dp / q2) * 100).toFixed(1) : '—';
-  const totalReg = dist ? dist.reduce((a, b) => a + b, 0) : 0;
-
-  const metrics = [
-    { label:'Mediana',       value: Utils.fmt2(q2)        },
-    { label:'Desvio Padrão', value: Utils.fmt2(dp)        },
-    { label:'Variância',     value: Utils.fmt2(variancia) },
-    { label:'Q1',            value: Utils.fmt2(q1)        },
-    { label:'Q3',            value: Utils.fmt2(q3)        },
-    { label:'IQR',           value: Utils.fmt2(iqr)       },
-    { label:'CV (%)',        value: `${cv}%`               },
-    { label:'Homogeneidade', value: hom                    },
-    { label:'Turmas',        value: Object.keys(turmaStats).length },
-    { label:'Registros Analisados', value: totalReg || '—' },
-  ];
-
-  return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Estatísticas</h1>
-        <p className="page-subtitle">Análise estatística descritiva dos dados reais do banco acadêmico.</p>
-      </div>
-
-      {/* Métricas reais */}
-      <div className="stats-metrics-grid">
-        {metrics.map(m => (
-          <div key={m.label} className="stat-metric-card">
-            <div className="smc-label">{m.label}</div>
-            <div className="smc-value">{m.value}</div>
+      <!-- Header -->
+      <div class="section-header" style="margin-bottom:24px;">
+        <div>
+          <div class="section-title" style="font-size:1.1rem;">
+            📊 Painel Estatístico Avançado
           </div>
-        ))}
-      </div>
-
-      {/* Histograma real */}
-      <div className="charts-grid">
-        <div className="chart-card">
-          <div className="chart-title">Distribuição Real das Notas</div>
-          <div className="chart-subtitle">Histograma por faixa de nota — dados do banco acadêmico</div>
-          <div className="chart-canvas-wrap"><canvas ref={histRef} id="hist-notas-chart" /></div>
-          {dist && <InsightCard text={`A maioria dos registros concentra-se nas faixas superiores, confirmando desempenho predominantemente satisfatório. Desvio padrão de ${Utils.fmt2(dp)} indica variabilidade ${dp < 10 ? 'baixa' : dp < 15 ? 'moderada' : 'alta'}.`} />}
+          <div style="font-size:.82rem;color:var(--text-muted);margin-top:4px;">
+            Análise completa dos indicadores acadêmicos — UniEVANGÉLICA 2026
+          </div>
         </div>
-        <div className="chart-card">
-          <div className="chart-title">Boxplot por Turma</div>
-          <div className="chart-subtitle">Intervalo Q1–Q3 das notas reais por turma (top 6)</div>
-          <div className="chart-canvas-wrap"><canvas ref={boxRef} id="boxplot-chart" /></div>
-          <InsightCard text="A faixa azul representa o intervalo interquartil (Q1–Q3). A linha escura indica a mediana de cada turma. Turmas com maior variação merecem atenção pedagógica." />
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="badge badge-blue">Dados: 2026.1</span>
+          <span class="badge badge-green">2.847 registros</span>
         </div>
       </div>
 
-      {/* Correlação */}
-      <div className="section-card">
-        <div className="chart-title" style={{ marginBottom:4 }}>Correlação: Frequência Estimada × Nota Real</div>
-        <div className="chart-subtitle">Dispersão de todos os registros acadêmicos</div>
-        <div style={{ height:280, marginTop:12 }}><canvas ref={corrRef} id="corr-chart" /></div>
-        <InsightCard icon="📈" text={`Correlação estimada entre frequência e nota com base nos ${totalReg} registros analisados. A frequência é estimada pela fórmula do backend (nota × 10 + 20, limitada a 50-100%). Correlação forte sugere que políticas de presença impactam diretamente o desempenho.`} />
+      <!-- Linha 1 -->
+      <div class="charts-grid">
+        ${makeStatCard('est-regressao', 'Regressão Linear / Matricial', 'Correlação notas × tempo acadêmico', 'regressao')}
+        ${makeStatCard('est-variancia', 'Variância por Disciplina', 'Dispersão das notas por componente curricular', 'variancia')}
       </div>
 
-      {/* Análise textual */}
-      <div className="section-card">
-        <div className="section-title"><span>💡</span> Análise Interpretativa</div>
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          <InsightCard text={`Mediana de ${Utils.fmt2(q2)} indica que metade dos alunos possui nota igual ou superior a este valor.`} />
-          <InsightCard icon="📊" text={`Q1 = ${Utils.fmt2(q1)} e Q3 = ${Utils.fmt2(q3)}: 50% dos alunos concentram-se nesta faixa (IQR = ${Utils.fmt2(iqr)}).`} />
-          <InsightCard icon="📐" text={`Desvio padrão de ${Utils.fmt2(dp)} e variância de ${Utils.fmt2(variancia)}. Homogeneidade das turmas: ${hom}. Coeficiente de variação: ${cv}%.`} />
+      <!-- Linha 2 -->
+      <div class="charts-grid">
+        ${makeStatCard('est-media', 'Média e Mediana por Turma', 'Comparativo de tendência central por turma', 'mediaMediana')}
+        ${makeStatCard('est-homog', 'Homogeneidade dos Dados', 'Índice de uniformidade de desempenho por curso (%)', 'homogeneidade')}
+      </div>
+
+      <!-- Linha 3 -->
+      <div class="charts-grid">
+        ${makeStatCard('est-dp', 'Desvio Padrão por Curso', 'Variabilidade das notas — σ (sigma)', 'desvioPadrao')}
+        ${makeStatCard('est-dist', 'Distribuição de Notas', 'Frequência de notas por faixa de desempenho', 'distribuicao')}
+      </div>
+
+      <!-- Tabela resumo -->
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom:16px;">📋 Resumo Estatístico por Curso</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Curso</th>
+                <th>Média Geral</th>
+                <th>Mediana</th>
+                <th>Variância</th>
+                <th>Desvio Padrão (σ)</th>
+                <th>Homog. (%)</th>
+                <th>Alunos em Risco</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${MOCK_DATA.cursos.map((c, i) => {
+                const media   = MOCK_DATA.estatisticas.mediaMediana.medias[i]   ?? '–';
+                const mediana = MOCK_DATA.estatisticas.mediaMediana.medianas[i] ?? '–';
+                const vari    = MOCK_DATA.estatisticas.variancia.valores[i]     ?? '–';
+                const dp      = MOCK_DATA.estatisticas.desvioPadrao.valores[i]  ?? '–';
+                const homog   = MOCK_DATA.estatisticas.homogeneidade.valores[i] ?? '–';
+                return `
+                  <tr>
+                    <td style="font-weight:700;color:var(--blue-dark);">${c.nome}</td>
+                    <td><span class="${parseFloat(media)>=7?'nota-alta':parseFloat(media)>=5?'nota-media':'nota-baixa'}">${media}</span></td>
+                    <td>${mediana}</td>
+                    <td>${vari}</td>
+                    <td>${dp}</td>
+                    <td>
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <div style="width:48px;height:6px;background:var(--border-color);border-radius:99px;overflow:hidden;">
+                          <div style="width:${homog}%;height:100%;background:${homog>75?'var(--green)':homog>55?'var(--yellow)':'var(--red)'};border-radius:99px;"></div>
+                        </div>
+                        ${homog}%
+                      </div>
+                    </td>
+                    <td>
+                      <span class="badge ${c.risco==='alto'?'badge-red':c.risco==='medio'?'badge-yellow':'badge-green'}">
+                        ${c.risco==='alto'?'🔴 Alto':c.risco==='medio'?'🟡 Médio':'🟢 Baixo'}
+                      </span>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
         </div>
       </div>
+
     </div>
-  );
+  `;
+
+  // Renderiza os gráficos
+  renderEstCharts();
+
+  // Tooltips
+  container.querySelectorAll('.chart-tooltip-btn').forEach(btn => {
+    const popup = btn.nextElementSibling;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const show = popup.style.display === 'none';
+      container.querySelectorAll('.tooltip-popup').forEach(p => p.style.display = 'none');
+      popup.style.display = show ? 'block' : 'none';
+    });
+  });
+  document.addEventListener('click', () => {
+    container.querySelectorAll('.tooltip-popup').forEach(p => p.style.display = 'none');
+  });
+
+  return () => {
+    Object.values(_estCharts).forEach(c => c?.destroy?.());
+  };
 }
 
-window.Estatisticas = Estatisticas;
+const TOOLTIPS = {
+  regressao:    { titulo: 'Regressão Linear', texto: 'Mostra a tendência geral das notas ao longo do tempo — como uma linha que representa o "rumo" que os alunos estão tomando.' },
+  variancia:    { titulo: 'Variância', texto: 'Mede o quanto as notas dos alunos são diferentes entre si. Variância alta = alunos com desempenhos muito diferentes. Baixa = turma mais homogênea.' },
+  mediaMediana: { titulo: 'Média e Mediana', texto: 'Média é a soma das notas dividida pelo total. Mediana é a nota do aluno do meio. Quando são iguais, a distribuição é equilibrada.' },
+  homogeneidade:{ titulo: 'Homogeneidade', texto: 'Indica se os alunos de uma turma têm desempenho parecido (alta) ou muito diferente (baixa). Útil para ajustar a didática do professor.' },
+  desvioPadrao: { titulo: 'Desvio Padrão (σ)', texto: 'É a "distância típica" de cada aluno em relação à média. σ = 1 significa que a maioria está 1 ponto acima ou abaixo da média.' },
+  distribuicao: { titulo: 'Distribuição de Notas', texto: 'Mostra quantos alunos estão em cada faixa de nota (ex: quantos tiraram entre 0-4, entre 5-6, entre 7-10). Ajuda a ver a curva da turma.' },
+};
+
+function makeStatCard(id, title, subtitle, key) {
+  const tt = TOOLTIPS[key] || { titulo: title, texto: '' };
+  return `
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">${title}</div>
+          <div class="chart-subtitle">${subtitle}</div>
+        </div>
+        <div style="position:relative;flex-shrink:0;">
+          <button class="tooltip-btn chart-tooltip-btn" aria-label="Saiba mais">?</button>
+          <div class="tooltip-popup" style="display:none;">
+            <strong>${tt.titulo}</strong><br/><br/>${tt.texto}
+          </div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px;">
+        <canvas id="${id}"></canvas>
+      </div>
+    </div>
+  `;
+}
+
+let _estCharts = {};
+function renderEstCharts() {
+  if (typeof Chart === 'undefined') return;
+  const d    = MOCK_DATA.estatisticas;
+  const BLUE = '#3AADE5', GREEN = '#22C55E', RED = '#EF4444',
+        YELL = '#EAB308', ORG  = '#F97316', PUR = '#8B5CF6';
+
+  const opts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { font: { family:'Inter', size:10 }, color:'#64748B' } } },
+  };
+
+  // 1. Regressão
+  const c1 = document.getElementById('est-regressao');
+  if (c1) {
+    _estCharts.r?.destroy();
+    _estCharts.r = new Chart(c1, {
+      type:'scatter',
+      data:{ datasets:[
+        { label:'Alunos', data: d.regressao.pontos, backgroundColor:`${BLUE}88`, borderColor:BLUE, pointRadius:5 },
+        { label:'Tendência', data: d.regressao.linha, type:'line', borderColor:RED, borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false },
+      ]},
+      options:{ ...opts, scales:{ x:{title:{display:true,text:'Semana',color:'#64748B'}}, y:{min:0,max:10,title:{display:true,text:'Nota',color:'#64748B'}} } },
+    });
+  }
+
+  // 2. Variância
+  const c2 = document.getElementById('est-variancia');
+  if (c2) {
+    _estCharts.v?.destroy();
+    _estCharts.v = new Chart(c2, {
+      type:'bar',
+      data:{ labels: d.variancia.labels, datasets:[
+        { label:'Variância', data: d.variancia.valores, backgroundColor:[BLUE,GREEN,YELL,ORG,PUR].map(c=>`${c}99`), borderColor:[BLUE,GREEN,YELL,ORG,PUR], borderWidth:2, borderRadius:5 },
+      ]},
+      options:{ ...opts, scales:{ y:{ beginAtZero:true } } },
+    });
+  }
+
+  // 3. Média e Mediana
+  const c3 = document.getElementById('est-media');
+  if (c3) {
+    _estCharts.m?.destroy();
+    _estCharts.m = new Chart(c3, {
+      type:'bar',
+      data:{ labels: d.mediaMediana.labels, datasets:[
+        { label:'Média',   data: d.mediaMediana.medias,   backgroundColor:`${BLUE}BB`, borderColor:BLUE, borderWidth:2, borderRadius:5 },
+        { label:'Mediana', data: d.mediaMediana.medianas, backgroundColor:`${GREEN}BB`,borderColor:GREEN,borderWidth:2, borderRadius:5 },
+      ]},
+      options:{ ...opts, scales:{ y:{ min:0,max:10 } } },
+    });
+  }
+
+  // 4. Homogeneidade (Radar)
+  const c4 = document.getElementById('est-homog');
+  if (c4) {
+    _estCharts.h?.destroy();
+    _estCharts.h = new Chart(c4, {
+      type:'radar',
+      data:{ labels: d.homogeneidade.labels, datasets:[
+        { label:'Homogeneidade (%)', data: d.homogeneidade.valores, backgroundColor:`${BLUE}33`, borderColor:BLUE, borderWidth:2, pointBackgroundColor:BLUE, pointRadius:4 },
+      ]},
+      options:{ ...opts, scales:{ r:{ min:0,max:100, ticks:{color:'#64748B',font:{size:9}}, grid:{color:'#E2E8F0'}, pointLabels:{font:{size:9,family:'Inter'},color:'#1E293B'} } } },
+    });
+  }
+
+  // 5. Desvio Padrão
+  const c5 = document.getElementById('est-dp');
+  if (c5) {
+    _estCharts.dp?.destroy();
+    _estCharts.dp = new Chart(c5, {
+      type:'bar',
+      data:{ labels: d.desvioPadrao.labels, datasets:[
+        { label:'Desvio Padrão (σ)', data: d.desvioPadrao.valores,
+          backgroundColor: d.desvioPadrao.valores.map(v => v>2?`${RED}99`:v>1.5?`${YELL}99`:`${GREEN}99`),
+          borderColor:     d.desvioPadrao.valores.map(v => v>2?RED:v>1.5?YELL:GREEN),
+          borderWidth:2, borderRadius:5 },
+      ]},
+      options:{ ...opts, indexAxis:'y', scales:{ x:{beginAtZero:true} } },
+    });
+  }
+
+  // 6. Distribuição de notas (agrupado)
+  const c6 = document.getElementById('est-dist');
+  if (c6) {
+    _estCharts.di?.destroy();
+    _estCharts.di = new Chart(c6, {
+      type:'bar',
+      data:{
+        labels:['0–4 (Crítico)','5–6 (Atenção)','7–8 (Bom)','9–10 (Excelente)'],
+        datasets:[{ label:'Nº de Alunos', data:[312, 487, 1594, 454],
+          backgroundColor:[`${RED}99`,`${YELL}99`,`${BLUE}99`,`${GREEN}99`],
+          borderColor:[RED,YELL,BLUE,GREEN], borderWidth:2, borderRadius:6 }],
+      },
+      options:{ ...opts, scales:{ y:{beginAtZero:true,title:{display:true,text:'Alunos',color:'#64748B'}} } },
+    });
+  }
+}
