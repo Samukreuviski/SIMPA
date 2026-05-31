@@ -3,19 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Predicta — Sistema Inteligente de Monitoramento e Predição Acadêmica. Acompanhe indicadores institucionais, predições e estatísticas em tempo real." />
+  <meta name="description" content="Predicta — Sistema Inteligente de Monitoramento e Predição Acadêmica." />
   <meta name="robots" content="noindex, nofollow" />
   <title>Predicta — SIMPA | Monitoramento Acadêmico</title>
 
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
-  <!-- Design System -->
   <link rel="stylesheet" href="styles.css" />
-
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -33,82 +28,102 @@
   <!-- ───── APP SHELL ───── -->
   <div class="app-shell" id="app-shell" style="display:none;">
 
-    <!-- Sidebar -->
+    <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
-      <!-- Logo area -->
+
+      <!-- Logo + Toggle no topo -->
       <div class="sidebar-logo-area">
+        <!-- Logo expandida -->
         <img src="Logo - (SEM FUNDO) (1).png" alt="Predicta" class="sidebar-logo-full"
              onerror="this.style.display='none'" />
+        <!-- Apenas símbolo quando retraída -->
         <img src="Simbolo - (SEM FUNDO).png" alt="Predicta" class="sidebar-logo-symbol"
              onerror="this.style.display='none'" />
+        <!-- Botão minimizar — agora no topo, alinhado com a logo -->
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Retrair/Expandir sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
       </div>
 
-      <!-- Navigation -->
+      <!-- Navegação principal -->
       <nav class="sidebar-nav" id="sidebar-nav" aria-label="Navegação principal"></nav>
 
-      <!-- Footer with toggle -->
+      <!-- Área inferior: Config + Perfil -->
       <div class="sidebar-footer">
-        <div class="sidebar-perfil" id="sidebar-perfil"></div>
+        <!-- Configurações -->
+        <button class="sidebar-config-btn" id="sidebar-config-btn" aria-label="Configurações" data-label="Configurações">
+          <span class="nav-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </span>
+          <span class="nav-item-label">Configurações</span>
+        </button>
+
+        <!-- Perfil do usuário (clicável) -->
+        <div class="sidebar-perfil" id="sidebar-perfil" role="button" tabindex="0"
+             aria-label="Perfil do usuário" data-label="Meu Perfil"></div>
       </div>
 
-      <!-- Toggle button (pill on edge) -->
-      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Retrair/Expandir sidebar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
     </aside>
 
-    <!-- Main content -->
+    <!-- CONTEÚDO PRINCIPAL -->
     <div class="main-content" id="main-content">
-      <!-- Saudação dinâmica (top left) -->
+
+      <!-- Saudação dinâmica (topo esquerdo, abaixo dos ícones flutuantes) -->
       <div class="greeting-bar" id="greeting-bar">
-        <div>
+        <div class="greeting-left">
           <h1 class="greeting-title" id="greeting-title">Carregando...</h1>
           <p class="greeting-sub" id="greeting-sub">Resumo preditivo das suas turmas e alertas de alunos.</p>
         </div>
         <div class="greeting-period" id="greeting-period"></div>
       </div>
 
-      <!-- Page content -->
+      <!-- Conteúdo da página (SPA) -->
       <main class="page-content" id="page-content" role="main" aria-live="polite"></main>
     </div>
   </div>
 
   <!-- ───── FLOATING ACTIONS (fixed top-right) ───── -->
   <div class="floating-actions" id="floating-actions" style="display:none;">
+
     <!-- Notificações -->
     <div class="float-btn-wrap">
       <button class="float-btn" id="btn-notif" aria-label="Notificações">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
         </svg>
         <span class="float-badge" id="notif-badge" style="display:none;"></span>
       </button>
-      <!-- Dropdown notificações -->
       <div class="notif-dropdown" id="notif-dropdown" style="display:none;"></div>
     </div>
 
-    <!-- Perfil / Configurações -->
+    <!-- FAQ — SVG limpo e nítido -->
+    <button class="float-btn float-btn-faq" id="btn-faq" aria-label="Perguntas frequentes">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.5-2.4 2.5"/>
+        <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
+
+    <!-- Perfil/Avatar -->
     <button class="float-btn float-btn-avatar" id="btn-profile" aria-label="Perfil e configurações">
       <span id="float-avatar-text">SK</span>
     </button>
 
-    <!-- FAQ -->
-    <button class="float-btn float-btn-faq" id="btn-faq" aria-label="Perguntas frequentes">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-      </svg>
-    </button>
   </div>
 
-  <!-- ───── MODAL ROOT ───── -->
+  <!-- Modal root -->
   <div id="modal-root"></div>
 
-  <!-- ───── ENTRY POINT (ES6 modules) ───── -->
+  <!-- Entry point ES6 -->
   <script type="module" src="js/App.js"></script>
 </body>
 </html>

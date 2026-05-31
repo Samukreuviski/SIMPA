@@ -1,95 +1,87 @@
 /**
- * App.js — Predicta
- * Entry point principal (ES6 module).
- * Orquestra: splash, sidebar, floating actions, router, tema.
+ * App.js v2 — Predicta
+ * Entry point principal. Rotas atualizadas para estrutura correta do Figma.
  */
 
-import { state }             from './state.js';
-import { Router }            from './router.js';
-import { initSidebar }       from './components/Sidebar.js';
+import { state }               from './state.js';
+import { Router }              from './router.js';
+import { initSidebar }         from './components/Sidebar.js';
 import { initFloatingActions } from './components/FloatingActions.js';
 
-import { renderDashboard }   from './pages/Dashboard.js';
-import { renderCursos }      from './pages/Cursos.js';
-import { renderPredicao }    from './pages/Predicao.js';
-import { renderNotas }       from './pages/Notas.js';
-import { renderEstatisticas }from './pages/Estatisticas.js';
+import { renderDashboard }     from './pages/Dashboard.js';
+import { renderCursos }        from './pages/Cursos.js';
+import { renderEstatPredicao } from './pages/EstatPredicao.js';  /* ← combinado */
+import { renderNotas }         from './pages/Notas.js';
+import { renderNotificacoes }  from './pages/Notificacoes.js';   /* ← novo */
 
-// ──────────────────────────────────────────────────────────────
-//  Bootstrap
+/* Páginas de compatibilidade: predição e estatísticas separadas redirecionam */
+const redirectTo = (hash) => async (container) => {
+  location.hash = hash;
+};
+
 // ──────────────────────────────────────────────────────────────
 (async function init() {
 
-  // 1. Carrega tema salvo antes de qualquer render
+  // 1. Carrega tema salvo
   state.loadSavedTheme();
 
-  // 2. Configura o router SPA (hash-based)
+  // 2. Router com mapeamento correto
   const router = new Router({
-    dashboard:    renderDashboard,
-    cursos:       renderCursos,
-    predicao:     renderPredicao,
-    notas:        renderNotas,
-    estatisticas: renderEstatisticas,
+    dashboard:     renderDashboard,
+    cursos:        renderCursos,
+    estatpredicao: renderEstatPredicao,  /* aba combinada */
+    notas:         renderNotas,
+    notificacoes:  renderNotificacoes,
+    /* aliases de compatibilidade */
+    predicao:      renderEstatPredicao,
+    estatisticas:  renderEstatPredicao,
   });
 
-  // 3. Inicia sidebar (passa router para navegação)
+  // 3. Sidebar
   initSidebar(router);
 
-  // 4. Mostra shell + floating actions após splash
+  // 4. Exibe shell após splash (1.8s)
   const splash    = document.getElementById('splash');
   const appShell  = document.getElementById('app-shell');
   const floatActs = document.getElementById('floating-actions');
 
-  // Aguarda splash de 1.8s (mesmo tempo da animação)
   setTimeout(() => {
     if (splash) {
       splash.classList.add('hidden');
-      // Remove do DOM após transição
       splash.addEventListener('transitionend', () => splash.remove(), { once: true });
     }
-
     if (appShell)  appShell.style.display  = 'flex';
     if (floatActs) floatActs.style.display = 'flex';
 
-    // 5. Inicia floating actions (notif, perfil, FAQ)
     initFloatingActions();
-
-    // 6. Inicia router (resolve rota atual)
     router.init();
 
   }, 1800);
 
-  // ─── Reage a mudança de role: re-renderiza página atual ────
+  // 5. Reage a mudança de role → re-renderiza página atual
   state.on('change', async e => {
     if (e.detail.key === 'currentRole') {
       const page = location.hash.replace('#', '') || 'dashboard';
       const container = document.getElementById('page-content');
       if (!container) return;
 
-      // Re-renderiza a página atual com o novo perfil
       const routeMap = {
-        dashboard:    renderDashboard,
-        cursos:       renderCursos,
-        predicao:     renderPredicao,
-        notas:        renderNotas,
-        estatisticas: renderEstatisticas,
+        dashboard:     renderDashboard,
+        cursos:        renderCursos,
+        estatpredicao: renderEstatPredicao,
+        notas:         renderNotas,
+        notificacoes:  renderNotificacoes,
+        predicao:      renderEstatPredicao,
+        estatisticas:  renderEstatPredicao,
       };
       const fn = routeMap[page];
-      if (fn) {
-        container.innerHTML = '';
-        await fn(container);
-      }
+      if (fn) { container.innerHTML = ''; await fn(container); }
     }
   });
 
-  // ─── Adiciona estilo spin para o botão Lyceum ──────────────
+  // 6. Inject @keyframes spin para botão Lyceum
   const style = document.createElement('style');
-  style.textContent = `
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
-    }
-  `;
+  style.textContent = `@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`;
   document.head.appendChild(style);
 
 })();
