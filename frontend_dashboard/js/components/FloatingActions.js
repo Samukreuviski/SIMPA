@@ -76,3 +76,4 @@ export function initFloatingActions() {
   // ─── FAQ ──────────────────────────────────────────────────
   btnFaq.addEventListener('click', () => openFaqModal());
 }
+

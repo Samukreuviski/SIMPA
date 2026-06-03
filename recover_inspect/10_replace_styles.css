@@ -1,0 +1,48 @@
+/* ── CSS Tokens (Light) ─────────────────────────────────────── */
+:root {
+  --blue-primary:    #3FA9F5;
+  --blue-dark:       #003D61;
+  --blue-deep:       #004D7B;
+  --blue-sidebar:    #004D7B;
+  --blue-light-bg:   #EFF8FF;
+  --white:           #FFFFFF;
+  --gray-bg:         #F6F6F6;
+  --gray-bg2:        #EEEEEE;
+  --gray-border:     #E2E8F0;
+  --gray-text:       #8D8C8C;
+  --text-main:       #003D61;
+  --text-secondary:  #475569;
+  --green:           #1F9A00;
+  --green-dark:      #167500;
+  --yellow:          #F0CD00;
+  --yellow-dark:     #CA8A04;
+  --red:             #EF4444;
+  --red-dark:        #DC2626;
+  --orange:          #F97316;
+
+  /* Layout */
+  --sidebar-w:           320px;
+  --sidebar-collapsed-w:  102px;
+  --radius:      12px;
+  --radius-card: 35px;
+  --radius-sm:    8px;
+  --radius-xs:    6px;
+
+  /* Shadows */
+  --shadow:       0px 4px 4px rgba(0,0,0,.25);
+  --shadow-md:    0 4px 24px rgba(0,61,97,.12);
+  --shadow-lg:    0 8px 48px rgba(0,61,97,.18);
+  --shadow-float: 0 4px 20px rgba(0,0,0,.18);
+
+  /* Transitions */
+  --transition:      0.22s cubic-bezier(.4,0,.2,1);
+  --transition-slow: 0.38s cubic-bezier(.4,0,.2,1);
+
+  /* Semantic tokens (sobrescritos nos temas) */
+  --bg-page:       #FFFFFF;
+  --bg-card:       #F6F6F6;
+  --bg-card-hover: #EEEEEE;
+  --border-color:  var(--gray-border);
+  --text:          var(--text-main);
+  --text-muted:    var(--gray-text);
+}

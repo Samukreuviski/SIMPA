@@ -15,3 +15,4 @@ function EmptyState({ title = 'Sem dados', desc = '', onRetry }) {
 }
 
 window.EmptyState = EmptyState;
+

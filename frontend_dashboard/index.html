@@ -9,7 +9,8 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="Logo Branca - (SEM FUNDO).png" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -18,10 +19,55 @@
   <!-- ───── SPLASH SCREEN ───── -->
   <div class="splash-screen" id="splash">
     <div class="splash-content">
-      <img src="Simbolo - (SEM FUNDO).png" alt="Predicta" class="splash-symbol"
+      <img src="Logo Branca - (SEM FUNDO).png" alt="Predicta" class="splash-symbol" style="width:260px; height:auto; margin-bottom: 24px; position:relative; z-index:2;"
            onerror="this.style.display='none'" />
       <div class="splash-bar"><div class="splash-bar-fill"></div></div>
       <p class="splash-text">Carregando Predicta...</p>
+    </div>
+  </div>
+
+  <!-- ───── LOGIN SCREEN ───── -->
+  <div class="login-screen" id="login-screen" style="display:none;">
+    <div class="login-panel">
+      <!-- Lado Esquerdo: Branding -->
+      <div class="login-brand">
+        <div class="login-logo-stack">
+          <img src="Logo - (SEM FUNDO) (1).png" alt="Predicta" style="width: 200px; height: auto; margin-bottom: 24px;" onerror="this.style.display='none'" />
+        </div>
+        <p class="login-tagline">Sistema Inteligente de Monitoramento e<br>Predição Acadêmica</p>
+        <div class="login-inst">UNIEVANGÉLICA</div>
+      </div>
+
+      <!-- Lado Direito: Form -->
+      <div class="login-form">
+        <h2 class="login-title">Acesse sua conta</h2>
+        <p class="login-sub">Entre com seu e-mail institucional para continuar.</p>
+        
+        <div id="login-error-msg" class="login-error" style="display:none;">Usuário ou senha incorretos.</div>
+
+        <form id="login-form-submit" onsubmit="event.preventDefault(); window.doLogin();">
+          <div class="login-field">
+            <label for="login-email">E-mail Institucional</label>
+            <input type="email" id="login-email" placeholder="seu.nome@unievangelica.edu.br" required />
+          </div>
+          <div class="login-field" style="margin-bottom: 24px;">
+            <label for="login-senha">Senha</label>
+            <input type="password" id="login-senha" placeholder="••••••••" required />
+          </div>
+          <button type="submit" class="login-submit" id="btn-login">Entrar no Predicta</button>
+        </form>
+
+        <!-- Botões de Demonstração (Atalhos) -->
+        <div class="login-demo">
+          <span class="login-demo-label">Demonstração rápida:</span>
+          <div class="login-demo-btns">
+            <button type="button" class="login-demo-btn" onclick="window.doLoginDemo('admin')">Admin</button>
+            <button type="button" class="login-demo-btn" onclick="window.doLoginDemo('gestao')">Gestão</button>
+            <button type="button" class="login-demo-btn" onclick="window.doLoginDemo('academico')">Professor</button>
+          </div>
+          <div class="login-demo-hint">Senha demo: <code>predicta123</code></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -33,16 +79,33 @@
 
       <!-- Logo + Toggle no topo -->
       <div class="sidebar-logo-area">
-        <!-- Logo expandida -->
-        <img src="Logo - (SEM FUNDO) (1).png" alt="Predicta" class="sidebar-logo-full"
-             onerror="this.style.display='none'" />
-        <!-- Apenas símbolo quando retraída -->
-        <img src="Simbolo - (SEM FUNDO).png" alt="Predicta" class="sidebar-logo-symbol"
-             onerror="this.style.display='none'" />
-        <!-- Botão minimizar — agora no topo, alinhado com a logo -->
-        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Retrair/Expandir sidebar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
+        
+        <!-- Toggle para abrir o menu quando clicado na logo (estado recolhido) -->
+        <button class="sidebar-brand-btn" id="sidebar-brand-btn" aria-label="Expandir menu">
+          <!-- Logo expandida -->
+          <div class="sidebar-logo-expanded">
+            <img src="Logo Branca - (SEM FUNDO).png" alt="Predicta" class="sidebar-logo-full"
+                 onerror="this.style.display='none'" />
+          </div>
+
+          <!-- Apenas símbolo + hover hint quando retraída -->
+          <div class="sidebar-collapsed-brand">
+            <img src="Simbolo Branco - (SEM FUNDO).png" alt="Predicta" class="sidebar-logo-symbol"
+                 onerror="this.style.display='none'" />
+            <div class="sidebar-expand-hint">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </div>
+          </div>
+        </button>
+
+        <!-- Botão minimizar explícito — visível apenas quando expandido -->
+        <button class="sidebar-collapse-btn" id="sidebar-toggle" aria-label="Retrair sidebar">
+          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor">
+            <path d="M9.5 1.5v9a1 1 0 0 1-1.5.866l-7.5-4.5a1 1 0 0 1 0-1.732l7.5-4.5A1 1 0 0 1 9.5 1.5z"/>
           </svg>
         </button>
       </div>
@@ -93,10 +156,9 @@
     <!-- Notificações -->
     <div class="float-btn-wrap">
       <button class="float-btn" id="btn-notif" aria-label="Notificações">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        <svg width="24" height="24" viewBox="4 3 24 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 22px; height: auto;">
+          <path d="M15.2012 3.91964C15.6804 4.00509 15.9911 4.25313 16.1352 4.66377C16.1865 4.81043 16.2095 5.00109 16.2051 5.23701C16.1993 5.54627 16.1986 5.8702 16.2038 6.20815C16.2038 6.22218 16.214 6.23365 16.2281 6.23557C20.0366 6.78585 22.8771 10.0544 22.8925 13.8975C22.8944 14.4083 22.8957 15.4406 22.8951 16.9939C22.8951 19.049 23.7503 21.0423 25.2538 22.426C25.4339 22.5918 25.6754 22.7939 25.8137 22.9725C26.0969 23.3366 26.2378 23.7364 26.2366 24.1719C26.2346 25.0467 25.6491 25.8304 24.8003 26.0555C24.6312 26.1008 24.2871 26.1231 23.7695 26.1224C12.5516 26.1205 6.60342 26.1205 5.92372 26.1224C4.1761 26.1256 3.28371 24.1094 4.48872 22.8239C4.51307 22.7984 4.64183 22.6792 4.87502 22.4675C6.39842 21.085 7.27607 19.0745 7.27735 17.0181C7.27799 15.1396 7.27863 14.1041 7.27927 13.9109C7.29144 10.064 10.1211 6.78968 13.9507 6.23302C13.9622 6.2311 13.9699 6.22154 13.9699 6.2107C13.9712 5.8466 13.9712 5.45955 13.9699 5.04955C13.9667 4.45845 14.3883 4.00636 14.9693 3.91837H15.2012V3.91964Z" fill="currentColor"/>
+          <path d="M15.3036 30.0408H14.8743C13.0237 29.9095 11.5549 28.6135 11.1509 26.7968C11.149 26.7874 11.1552 26.7774 11.1644 26.7755H11.1675H19.0006C19.0123 26.7755 19.0215 26.7849 19.0215 26.7968V26.8011C18.6237 28.626 17.145 29.8964 15.3036 30.0408Z" fill="currentColor"/>
         </svg>
         <span class="float-badge" id="notif-badge" style="display:none;"></span>
       </button>
@@ -105,11 +167,9 @@
 
     <!-- FAQ — SVG limpo e nítido -->
     <button class="float-btn float-btn-faq" id="btn-faq" aria-label="Perguntas frequentes">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.5-2.4 2.5"/>
-        <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 24px; height: auto;">
+        <path d="M14.2601 0C18.1411 0.0901802 21.8197 1.76261 24.3807 4.61811C26.6838 7.18541 27.8903 10.2244 28 13.7339V14.2598C27.9521 16.3302 27.493 18.2599 26.6239 20.0484C25.8041 21.7347 24.7219 23.1814 23.3761 24.3865C20.8094 26.6858 17.7728 27.8903 14.2658 28H13.7399C11.6695 27.9521 9.74031 27.493 7.9518 26.624C6.2705 25.8067 4.82885 24.7289 3.62621 23.3901C1.31868 20.8209 0.109732 17.7794 0 14.2661V13.7402C0.171535 6.20604 6.19735 0.176577 13.7354 0H14.2601ZM26.6 14C26.6 7.04099 20.9589 1.4 13.9997 1.4C7.04052 1.4 1.3994 7.04099 1.3994 14C1.3994 20.959 7.04052 26.6 13.9997 26.6C20.9589 26.6 26.6 20.959 26.6 14Z" fill="currentColor"/>
+        <path d="M18.847 9.878C18.847 10.8715 18.6661 11.6033 18.3045 12.0734C17.9429 12.5434 17.4334 12.915 16.7761 13.1878C16.4892 13.308 16.2307 13.4357 15.9961 13.5746C15.7615 13.7099 15.5833 13.8827 15.4616 14.0931C15.344 14.2997 15.2852 14.5777 15.2852 14.9272H13.0645C13.0645 14.4764 13.1256 14.0744 13.2479 13.7212C13.3702 13.3642 13.5511 13.06 13.7909 12.8083C14.0307 12.5566 14.3316 12.3387 14.6936 12.1546C15.1169 11.9517 15.4977 11.7225 15.836 11.467C16.1788 11.2078 16.4352 10.8997 16.6053 10.5428C16.7793 10.1821 16.8663 9.77633 16.8663 9.3255C16.8663 8.7845 16.7461 8.35622 16.5057 8.04067C16.2694 7.72133 15.9525 7.49217 15.555 7.35317C15.1575 7.21033 14.7176 7.13892 14.2355 7.13892C13.6262 7.13892 13.1098 7.23475 12.6865 7.42642C12.2673 7.61808 11.9366 7.89242 11.6946 8.24942C11.4565 8.60267 11.3375 9.02733 11.3375 9.52342H9.20815C9.20815 8.72317 9.40059 8.02058 9.78546 7.4155C10.1703 6.81042 10.7093 6.34067 11.4024 6.00625C12.0995 5.66808 12.9234 5.499 13.8741 5.499C14.9392 5.499 15.8647 5.67933 16.6504 6.04C17.4361 6.39692 18.0416 6.90217 18.4668 7.55583C18.892 8.2095 19.1046 8.98356 19.1046 9.878H18.847ZM14.1206 19.6457C13.6496 19.6457 13.2575 19.4973 12.9442 19.2005C12.6349 18.9038 12.4802 18.5376 12.4802 18.1018C12.4802 17.6586 12.6349 17.2905 12.9442 16.9975C13.2575 16.7007 13.6496 16.5524 14.1206 16.5524C14.6041 16.5524 15.0003 16.7007 15.3096 16.9975C15.6189 17.2905 15.7735 17.6586 15.7735 18.1018C15.7735 18.5376 15.6189 18.9038 15.3096 19.2005C15.0003 19.4973 14.6041 19.6457 14.1206 19.6457Z" fill="currentColor"/>
       </svg>
     </button>
 

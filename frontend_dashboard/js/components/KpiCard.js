@@ -11,3 +11,4 @@ function KpiCard({ label, value, desc, variant, icon }) {
 }
 
 window.KpiCard = KpiCard;
+

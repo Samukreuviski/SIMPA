@@ -5,7 +5,7 @@
 
 import { state }                 from '../state.js';
 import { MOCK_DATA }             from '../mockData.js';
-import { fmtNota, fmtPct, getRiscoBadge } from '../utils.js';
+import { fmtNota, fmtPct, getRiscoBadge, getNotaBadge } from '../utils.js';
 import { openInterventionModal } from '../components/InterventionModal.js';
 import { debounce }              from '../utils.js';
 
@@ -42,7 +42,7 @@ export async function renderNotas(container) {
       const media   = calcMedia(a);
       const mediaStr = media !== null ? fmtNota(media) : '—';
       const mediaCls = media === null ? '' : media >= 7 ? 'nota-alta' : media >= 5 ? 'nota-media' : 'nota-baixa';
-      const situacao = media === null ? '–' : media >= 7 ? '✅ Aprovado' : media >= 5 ? '⚠️ Recuperação' : '❌ Reprovado';
+      const situacao = media === null ? '–' : media >= 7 ? 'Aprovado' : media >= 5 ? 'Recuperação' : 'Reprovado';
 
       return `
         <tr data-search="${a.nome.toLowerCase()} ${disciplina.nome.toLowerCase()}">
@@ -54,24 +54,22 @@ export async function renderNotas(container) {
             <div style="font-weight:600;color:var(--text);font-size:.84rem;">${disciplina.nome}</div>
             <div style="font-size:.7rem;color:var(--text-muted);">${disciplina.codigo}</div>
           </td>
-          <td style="font-size:.82rem;color:var(--text-muted);">${turma?.nome?.split('—')[1]?.trim() || '–'}</td>
-          <td>${a.va1 > 0 ? `<span class="${a.va1 >= 7 ? 'nota-alta' : a.va1 >= 5 ? 'nota-media' : 'nota-baixa'}">${fmtNota(a.va1)}</span>` : '—'}</td>
-          <td>${a.va2 > 0 ? `<span class="${a.va2 >= 7 ? 'nota-alta' : a.va2 >= 5 ? 'nota-media' : 'nota-baixa'}">${fmtNota(a.va2)}</span>` : '—'}</td>
-          <td>${a.va3 > 0 ? `<span class="${a.va3 >= 7 ? 'nota-alta' : a.va3 >= 5 ? 'nota-media' : 'nota-baixa'}">${fmtNota(a.va3)}</span>` : '—'}</td>
-          <td><span class="${mediaCls}" style="font-size:.95rem;">${mediaStr}</span></td>
-          <td>${fmtPct(a.frequencia, 0)}</td>
-          <td style="font-size:.82rem;">${situacao}</td>
-          <td>${getRiscoBadge(a.risco)}</td>
-          <td>
+          <td style="text-align:center;font-size:.82rem;color:var(--text-muted);">${turma?.nome?.split('—')[1]?.trim() || '–'}</td>
+          <td style="text-align:center;">${a.va1 > 0 ? getNotaBadge(a.va1) : '—'}</td>
+          <td style="text-align:center;">${a.va2 > 0 ? getNotaBadge(a.va2) : '—'}</td>
+          <td style="text-align:center;">${a.va3 > 0 ? getNotaBadge(a.va3) : '—'}</td>
+          <td style="text-align:center;">${getNotaBadge(media)}</td>
+          <td style="text-align:center;">${fmtPct(a.frequencia, 0)}</td>
+          <td style="text-align:center;font-size:.82rem;">${situacao}</td>
+          <td style="text-align:center;">${getRiscoBadge(a.risco)}</td>
+          <td style="text-align:center;">
             ${a.risco !== 'baixo' ? `
               <button class="btn-intervene btn-notas-intervene" data-aluno="${a.id}"
-                      style="border:none;cursor:pointer;border-radius:6px;
-                      background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;
-                      font-size:.72rem;padding:5px 10px;font-weight:700;
-                      display:inline-flex;align-items:center;gap:4px;">
-                ✉️
+                      style="background:transparent; color:var(--text-strong); border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; transition:transform 0.2s;"
+                      onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z"/></svg>
               </button>
-            ` : '—'}
+            ` : ''}
           </td>
         </tr>
       `;
@@ -108,34 +106,35 @@ export async function renderNotas(container) {
       </div>
 
       <!-- Filtros + tabela -->
-      <div class="section-card" style="padding:0;overflow:hidden;">
-        <div style="padding:18px 20px;border-bottom:1px solid var(--border-color);
-            display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <div class="section-title">📋 Planilha de Rendimento Acadêmico</div>
-          <div class="notas-search-bar" style="margin-bottom:0;">
+      <div style="background:var(--bg-card); border-radius:12px; overflow:hidden; border:1px solid var(--border-color); margin-top:24px;">
+        <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:var(--text-main); display:flex; align-items:center;">Planilha de Rendimento Acadêmico</div>
+          <div class="notas-search-bar" style="margin-bottom:0; display:flex; gap:8px;">
             <input type="text" class="filter-input" id="notas-search"
-                   placeholder="🔍 Buscar aluno ou disciplina..." style="min-width:240px;" />
-            <select class="filter-select" id="notas-risco-filter">
+                   placeholder="Buscar aluno ou disciplina..." style="min-width:240px; padding:6px 12px; border-radius:6px; border:1px solid var(--border-color);" />
+            <select class="filter-select" id="notas-risco-filter" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border-color);">
               <option value="">Todos os riscos</option>
-              <option value="alto">🔴 Alto Risco</option>
-              <option value="medio">🟡 Risco Médio</option>
-              <option value="baixo">🟢 Baixo Risco</option>
+              <option value="alto">Alto Risco</option>
+              <option value="medio">Risco Médio</option>
+              <option value="baixo">Baixo Risco</option>
             </select>
           </div>
         </div>
-        <div class="table-wrap">
-          <table id="notas-table">
+        <div class="table-wrap" style="width:100%; overflow-x:auto;">
+          <table id="notas-table" style="width:100%; border-collapse:collapse; min-width:800px; font-family:'Poppins', sans-serif;">
             <thead>
               <tr>
-                <th>Aluno</th>
-                <th>Disciplina</th>
-                <th>Período</th>
-                <th>VA1</th><th>VA2</th><th>VA3</th>
-                <th>Média</th>
-                <th>Freq.</th>
-                <th>Situação</th>
-                <th>Risco</th>
-                <th>Ação</th>
+                <th style="padding:16px; text-align:left; font-weight:600; font-size:1.05rem;">Aluno</th>
+                <th style="padding:16px; text-align:left; font-weight:600; font-size:1.05rem;">Disciplina</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Período</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">VA1</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">VA2</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">VA3</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Média</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Freq.</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Situação</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Risco</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Ação</th>
               </tr>
             </thead>
             <tbody id="notas-tbody">
@@ -151,9 +150,9 @@ export async function renderNotas(container) {
 
       <!-- Legenda -->
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:.78rem;color:var(--text-muted);">
-        <span><span class="nota-alta">■</span> Aprovado (≥ 7.0)</span>
-        <span><span class="nota-media">■</span> Recuperação (5.0 – 6.9)</span>
-        <span><span class="nota-baixa">■</span> Reprovado (< 5.0)</span>
+        <span><span style="color:var(--green); font-size:.85rem; margin-right:4px;">▲</span> Aprovado (≥ 7.0)</span>
+        <span><span style="color:var(--yellow); font-size:.85rem; margin-right:4px;">▶</span> Recuperação (5.0 – 6.9)</span>
+          <strong>Semana</strong> 6 <span style="font-weight:300; font-size:1.15rem; color:var(--text-main);">|</span> 12Reprovado (< 5.0)</span>
       </div>
     </div>
   `;
@@ -196,3 +195,4 @@ export async function renderNotas(container) {
 
   bindInterventionBtns();
 }
+

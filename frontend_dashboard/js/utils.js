@@ -6,14 +6,14 @@
 /** Retorna saudação baseada no horário local */
 export function getGreeting(nome = '') {
   const h = new Date().getHours();
-  let saudacao, emoji;
-  if (h >= 5 && h < 12)  { saudacao = 'Bom dia';   emoji = '☀️'; }
-  else if (h >= 12 && h < 18) { saudacao = 'Boa tarde'; emoji = '🌤️'; }
-  else                         { saudacao = 'Boa noite'; emoji = '🌙'; }
+  let saudacao;
+  if (h >= 5 && h < 12)  { saudacao = 'Bom dia';   }
+  else if (h >= 12 && h < 18) { saudacao = 'Boa tarde'; }
+  else                         { saudacao = 'Boa noite'; }
 
   return nome
-    ? `${saudacao}, ${nome}! ${emoji}`
-    : `${saudacao}! ${emoji}`;
+    ? `${saudacao}, ${nome}!`
+    : `${saudacao}!`;
 }
 
 /** Retorna período acadêmico atual simulado */
@@ -52,29 +52,25 @@ export function getRiscoClass(risco) {
 /** Retorna badge HTML de risco */
 export function getRiscoBadge(risco) {
   switch (risco) {
-    case 'alto':  return '<span class="badge badge-red">🔴 Risco Alto</span>';
-    case 'medio': return '<span class="badge badge-yellow">🟡 Risco Médio</span>';
-    case 'baixo': return '<span class="badge badge-green">🟢 Risco Baixo</span>';
-    default:      return '<span class="badge badge-gray">–</span>';
+    case 'alto':  return '<span style="color:var(--text-strong); font-weight:700; font-size:.85rem; font-family:\'Poppins\', sans-serif;"><span style="color:var(--red); font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;">●</span>Risco Alto</span>';
+    case 'medio': return '<span style="color:var(--text-strong); font-weight:700; font-size:.85rem; font-family:\'Poppins\', sans-serif;"><span style="color:var(--yellow); font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;">●</span>Risco Médio</span>';
+    case 'baixo': return '<span style="color:var(--text-strong); font-weight:700; font-size:.85rem; font-family:\'Poppins\', sans-serif;"><span style="color:var(--green); font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;">●</span>Risco Baixo</span>';
+    default:      return '<span style="color:var(--text-strong); font-weight:700; font-size:.85rem; font-family:\'Poppins\', sans-serif;"><span style="color:#9e9e9e; font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;">●</span>–</span>';
   }
 }
 
 /** Retorna badge de nota */
 export function getNotaBadge(nota) {
   const n = Number(nota);
-  if (n >= 7) return `<span class="nota-alta">${fmtNota(n)}</span>`;
-  if (n >= 5) return `<span class="nota-media">${fmtNota(n)}</span>`;
-  return `<span class="nota-baixa">${fmtNota(n)}</span>`;
+  if (isNaN(n) || nota === '–' || nota === null || nota === '') return `<span style="color:var(--text-muted);">–</span>`;
+  if (n >= 7) return `<span style="color:var(--text-strong); font-weight:700;"><span style="color:var(--green); font-size:.85rem; margin-right:4px;">▲</span>${fmtNota(n)}</span>`;
+  if (n >= 5) return `<span style="color:var(--text-strong); font-weight:700;"><span style="color:var(--yellow); font-size:.85rem; margin-right:4px;">▶</span>${fmtNota(n)}</span>`;
+  return `<span style="color:var(--text-strong); font-weight:700;"><span style="color:var(--red); font-size:.85rem; margin-right:4px;">▼</span>${fmtNota(n)}</span>`;
 }
 
-/** Retorna subtítulo de greeting baseado no perfil */
+/** Retorna subtítulo de greeting (removido a pedido) */
 export function getGreetingSub(role) {
-  switch (role) {
-    case 'admin':    return 'Visão completa do sistema — todos os cursos e turmas.';
-    case 'gestao':   return 'Resumo preditivo geral dos seus cursos e indicadores.';
-    case 'academico':return 'Resumo preditivo das suas turmas e alertas de alunos.';
-    default:         return '';
-  }
+  return `Bem-vindo ao <img src="Predicta_sem_símbolo.png" alt="Predicta" style="height: .85rem; vertical-align: middle; margin-left: 3px; margin-top: -3px; object-fit: contain;">`;
 }
 
 /** Formata data para exibição */
@@ -106,3 +102,4 @@ export function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+

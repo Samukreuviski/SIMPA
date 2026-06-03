@@ -25,7 +25,7 @@ export function openFilterPanel(onApply) {
   panel.innerHTML = `
     <div class="filter-panel-header">
       <div>
-        <div class="filter-panel-title">🔍 Filtros Avançados</div>
+        <div class="filter-panel-title">Filtros Avançados</div>
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;">
           Refine os resultados com precisão
         </div>
@@ -41,7 +41,7 @@ export function openFilterPanel(onApply) {
 
       <!-- Gênero -->
       <div class="filter-section">
-        <div class="filter-section-title">👥 Gênero</div>
+        <div class="filter-section-title">Gênero</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${['Todos', 'Feminino', 'Masculino'].map(g => `
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
@@ -58,7 +58,7 @@ export function openFilterPanel(onApply) {
 
       <!-- Turma específica -->
       <div class="filter-section">
-        <div class="filter-section-title">🏫 Turma Específica</div>
+        <div class="filter-section-title">Turma Específica</div>
         <select class="filter-select" id="fp-turma" style="width:100%;">
           <option value="">Todas as turmas</option>
           ${turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')}
@@ -67,7 +67,7 @@ export function openFilterPanel(onApply) {
 
       <!-- Faixa de notas -->
       <div class="filter-section">
-        <div class="filter-section-title">📊 Faixa de Notas (Média)</div>
+        <div class="filter-section-title">Faixa de Notas (Média)</div>
         <div style="display:flex;gap:10px;align-items:center;">
           <div style="flex:1;">
             <div class="filter-label" style="margin-bottom:4px;">Mínima</div>
@@ -85,13 +85,13 @@ export function openFilterPanel(onApply) {
 
       <!-- Situação de Risco -->
       <div class="filter-section">
-        <div class="filter-section-title">⚠️ Nível de Risco</div>
+        <div class="filter-section-title">Nível de Risco</div>
         <div style="display:flex;flex-direction:column;gap:6px;">
           ${[
             { val: '', label: 'Todos os níveis', color: 'var(--text-muted)' },
-            { val: 'alto',  label: '🔴 Risco Alto',  color: 'var(--red)' },
-            { val: 'medio', label: '🟡 Risco Médio', color: 'var(--yellow)' },
-            { val: 'baixo', label: '🟢 Risco Baixo', color: 'var(--green)' },
+            { val: 'alto',  label: '&bull; Risco Alto',  color: 'var(--red)' },
+            { val: 'medio', label: '&bull; Risco Médio', color: 'var(--yellow)' },
+            { val: 'baixo', label: '&bull; Risco Baixo', color: 'var(--green)' },
           ].map(r => `
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;
               border-radius:8px;border:1.5px solid var(--border-color);
@@ -107,7 +107,7 @@ export function openFilterPanel(onApply) {
 
       <!-- Calendário interativo -->
       <div class="filter-section">
-        <div class="filter-section-title">📅 Intervalo de Datas</div>
+        <div class="filter-section-title">Intervalo de Datas</div>
         <div style="display:flex;gap:10px;margin-bottom:12px;">
           <div style="flex:1;">
             <div class="filter-label" style="margin-bottom:4px;">Data Início</div>
@@ -135,8 +135,8 @@ export function openFilterPanel(onApply) {
     </div>
 
     <div class="filter-panel-footer">
-      <button class="btn btn-outline" id="fp-reset" style="flex:1;">🗑️ Limpar</button>
-      <button class="btn btn-primary" id="fp-apply" style="flex:2;">✅ Aplicar Filtros</button>
+      <button class="btn btn-outline" id="fp-reset" style="flex:1;">Limpar</button>
+      <button class="btn btn-primary" id="fp-apply" style="flex:2;">Aplicar Filtros</button>
     </div>
   `;
 
@@ -256,3 +256,4 @@ export function openFilterPanel(onApply) {
     closePanel();
   });
 }
+

@@ -50,13 +50,78 @@ const redirectTo = (hash) => async (container) => {
       splash.classList.add('hidden');
       splash.addEventListener('transitionend', () => splash.remove(), { once: true });
     }
-    if (appShell)  appShell.style.display  = 'flex';
-    if (floatActs) floatActs.style.display = 'flex';
 
-    initFloatingActions();
-    router.init();
+    const loginScreen = document.getElementById('login-screen');
+    const isLoggedIn = localStorage.getItem('predicta_logged_in') === 'true';
 
+    if (loginScreen && !isLoggedIn) {
+      loginScreen.style.display = 'flex';
+    } else {
+      if (loginScreen) loginScreen.remove();
+      if (appShell)  appShell.style.display  = 'flex';
+      if (floatActs) floatActs.style.display = 'flex';
+      initFloatingActions();
+      router.init();
+    }
   }, 1800);
+
+  // 4b. Lógica de Login
+  window.doLoginDemo = (role) => {
+    const emailMap = { admin: 'admin', gestao: 'reitoria', academico: 'prof' };
+    const emailEl = document.getElementById('login-email');
+    if (emailEl) emailEl.value = `${emailMap[role] || role}@unievangelica.edu.br`;
+    const pwdEl = document.getElementById('login-senha');
+    if (pwdEl) pwdEl.value = 'predicta123';
+    state.set('currentRole', role);
+  };
+
+  window.doLogin = () => {
+    const btn = document.getElementById('btn-login');
+    const emailInput = document.getElementById('login-email');
+    
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Autenticando...';
+    }
+
+    setTimeout(() => {
+      if (emailInput && emailInput.value.trim() !== '') {
+        const val = emailInput.value.trim().toLowerCase();
+        let role = 'academico'; // default
+        let nome = val.split('@')[0];
+        nome = nome.charAt(0).toUpperCase() + nome.slice(1);
+        
+        if (val.includes('admin')) {
+          role = 'admin';
+          nome = 'Administrador Geral';
+        } else if (val.includes('reitoria') || val.includes('gestao') || val.includes('gestor')) {
+          role = 'gestao';
+          nome = 'Gestor Reitoria';
+        } else if (val.includes('samuel') || val.includes('kreuviski')) {
+          role = 'admin';
+          nome = 'Samuel Kreüviski';
+        }
+        
+        state.set('currentRole', role);
+        const perfil = state.getPerfil();
+        perfil.email = val;
+        perfil.nome = nome;
+      }
+
+      const loginScreen = document.getElementById('login-screen');
+      if (loginScreen) {
+        localStorage.setItem('predicta_logged_in', 'true');
+        loginScreen.classList.add('login-exit');
+        setTimeout(() => {
+          loginScreen.remove();
+          if (appShell)  appShell.style.display  = 'flex';
+          if (floatActs) floatActs.style.display = 'flex';
+          initFloatingActions();
+          router.init();
+        }, 400);
+      }
+    }, 800);
+  };
 
   // 5. Reage a mudança de role → re-renderiza página atual
   state.on('change', async e => {
@@ -85,3 +150,4 @@ const redirectTo = (hash) => async (container) => {
   document.head.appendChild(style);
 
 })();
+

@@ -8,6 +8,7 @@
 import { state }           from '../state.js';
 import { MOCK_DATA }       from '../mockData.js';
 import { openFilterPanel } from '../components/FilterPanel.js';
+import { getNotaBadge }    from '../utils.js';
 
 let _charts = {};
 
@@ -25,61 +26,27 @@ export async function renderEstatPredicao(container) {
   const periodoEl = document.getElementById('greeting-period');
   if (periodoEl) {
     periodoEl.innerHTML = `
-      <span>Período: <strong>26/03/2026 a 26/05/2026</strong></span>
-      <span class="period-badge">Semana 8/12</span>
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:var(--text-main); display:flex; align-items:center;">
+        <strong style="margin-right:6px;">Período:</strong> 26/03/2026 a 26/05/2026
+      </div>
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:var(--text-main); display:flex; flex-direction:column; gap:4px; margin-left:12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <strong>Semana</strong> 6 <span style="font-weight:300; font-size:1.15rem; color:var(--text-main);">|</span> 12
+        </div>
+        <div style="display:flex; width:100%; height:6px; border-radius:4px; overflow:hidden;">
+          <div style="width:50%; background:var(--green);"></div>
+          <div style="width:50%; background:var(--green); opacity:0.3;"></div>
+        </div>
+      </div>
     `;
   }
 
   container.innerHTML = `
-    <div class="page-fade-in">
-
-      <!-- Abas (Tabs) -->
-      <div class="page-tabs" id="ep-tabs">
-        <button class="page-tab active" data-tab="predicao">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-          Predição e Análise
-        </button>
-        <button class="page-tab" data-tab="estatisticas">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
-          Estatísticas Avançadas
-        </button>
-      </div>
-
-      <!-- Conteúdo das abas -->
-      <div id="ep-content"></div>
-
-    </div>
+    <div class="page-fade-in" id="ep-content"></div>
   `;
 
-  // Bind tabs
-  let currentTab = 'predicao';
-
-  function switchTab(tab) {
-    currentTab = tab;
-    // destroy charts
-    Object.values(_charts).forEach(c => c?.destroy?.());
-    _charts = {};
-
-    container.querySelectorAll('.page-tab').forEach(t => {
-      t.classList.toggle('active', t.dataset.tab === tab);
-    });
-
-    const content = container.querySelector('#ep-content');
-    if (tab === 'predicao') renderPredicaoContent(content);
-    else renderEstatContent(content);
-  }
-
-  container.querySelectorAll('.page-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-
-  switchTab('predicao');
+  const content = container.querySelector('#ep-content');
+  renderPredicaoContent(content);
 
   // cleanup
   return () => {
@@ -93,6 +60,8 @@ function renderPredicaoContent(wrapper) {
   const data = MOCK_DATA.estatisticas;
 
   wrapper.innerHTML = `
+
+
     <!-- Barra de filtros -->
     <div class="filters-bar-styled" style="margin-bottom:20px;">
       <div class="filter-group">
@@ -145,6 +114,57 @@ function renderPredicaoContent(wrapper) {
       ${makeChartCard('chart-dp',        'Desvio Padrão por Curso',      'Variabilidade (σ) das notas',        'desvioPadrao')}
       ${makeRegistrosCard(data.registros)}
     </div>
+    <!-- Tabela resumo -->
+    <div style="background:var(--bg-card); border-radius:12px; overflow:hidden; border:1px solid var(--border-color); margin-top:24px;">
+      <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-family:'Poppins', sans-serif; font-size:1.15rem; font-weight:700; color:var(--text-main);">Resumo Estatístico por Curso</div>
+      </div>
+      <div class="table-wrap" style="width:100%; overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; min-width:800px; font-family:'Poppins', sans-serif;">
+          <thead>
+            <tr>
+              <th style="padding:16px; text-align:left; font-weight:600; font-size:1.05rem;">Curso</th>
+              <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Média Geral</th>
+              <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Mediana</th>
+              <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Variância</th>
+              <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Desvio Padrão (σ)</th>
+              <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Homog. (%)</th>
+              <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Status de Risco</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${MOCK_DATA.cursos.map((c, i) => {
+              const d = MOCK_DATA.estatisticas;
+              const media   = d.mediaMediana.medias[i]   ?? '–';
+              const mediana = d.mediaMediana.medianas[i] ?? '–';
+              const vari    = d.variancia.valores[i]     ?? '–';
+              const dp      = d.desvioPadrao.valores[i]  ?? '–';
+              const homog   = d.homogeneidade.valores[i] ?? '–';
+              return `
+                <tr style="background:${i % 2 === 0 ? 'var(--bg-page)' : 'var(--bg-card)'};">
+                  <td style="font-weight:700;color:var(--text-strong); text-align:left; padding:16px;">${c.nome}</td>
+                  <td style="text-align:center; padding:16px; color:var(--text-strong);">${getNotaBadge(media)}</td>
+                  <td style="text-align:center; padding:16px; color:var(--text-strong);">${mediana}</td>
+                  <td style="text-align:center; padding:16px; color:var(--text-strong);">${vari}</td>
+                  <td style="text-align:center; padding:16px; color:var(--text-strong);">${dp}</td>
+                  <td style="padding:16px; color:var(--text-strong);">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
+                      <div style="width:48px;height:6px;background:var(--border-color);border-radius:99px;overflow:hidden;">
+                        <div style="width:${homog}%;height:100%;background:${homog > 75 ? 'var(--green)' : homog > 55 ? 'var(--yellow)' : 'var(--red)'};border-radius:99px;"></div>
+                      </div>
+                      ${homog}%
+                    </div>
+                  </td>
+                  <td style="text-align:center; padding:16px;">
+                    <span style="color:var(--text-strong); font-weight:700; font-size:.85rem; font-family:'Poppins', sans-serif;"><span style="color:${c.risco === 'alto' ? 'var(--red)' : c.risco === 'medio' ? 'var(--yellow)' : 'var(--green)'}; font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;">●</span>${c.risco === 'alto' ? 'Alto' : c.risco === 'medio' ? 'Médio' : 'Baixo'}</span>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
   `;
 
   // Tooltips
@@ -170,88 +190,6 @@ function renderPredicaoContent(wrapper) {
 
   // Charts
   renderCharts(data, 'chart-');
-}
-
-/* ─── ABA: ESTATÍSTICAS AVANÇADAS ───────────────────────────── */
-function renderEstatContent(wrapper) {
-  wrapper.innerHTML = `
-    <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:1rem;font-weight:700;color:var(--text);">Painel Estatístico Avançado</div>
-        <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px;">Análise completa — UniEVANGÉLICA 2026.1</div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <span class="badge badge-blue">2026.1</span>
-        <span class="badge badge-green">2.847 registros</span>
-      </div>
-    </div>
-
-    <div class="charts-grid">
-      ${makeChartCard('est-regressao', 'Regressão Linear', 'Tendência geral do período', 'regressao')}
-      ${makeChartCard('est-variancia', 'Variância por Disciplina', 'Dispersão das notas', 'variancia')}
-    </div>
-    <div class="charts-grid">
-      ${makeChartCard('est-media', 'Média e Mediana', 'Comparativo por turma', 'mediaMediana')}
-      ${makeChartCard('est-homog', 'Homogeneidade', 'Uniformidade por curso (%)', 'homogeneidade')}
-    </div>
-    <div class="charts-grid">
-      ${makeChartCard('est-dp', 'Desvio Padrão por Curso', 'Variabilidade σ', 'desvioPadrao')}
-      ${makeChartCard('est-dist', 'Distribuição de Notas', 'Alunos por faixa de desempenho', 'distribuicao')}
-    </div>
-
-    <!-- Tabela resumo -->
-    <div class="section-card" style="padding:0;overflow:hidden;margin-top:4px;">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);">
-        <div class="section-title">Resumo Estatístico por Curso</div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Curso</th>
-              <th>Média</th><th>Mediana</th><th>Variância</th>
-              <th>Desv. Padrão (σ)</th><th>Homog. (%)</th><th>Status de Risco</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${MOCK_DATA.cursos.map((c, i) => {
-              const d = MOCK_DATA.estatisticas;
-              const media   = d.mediaMediana.medias[i]   ?? '–';
-              const mediana = d.mediaMediana.medianas[i] ?? '–';
-              const vari    = d.variancia.valores[i]     ?? '–';
-              const dp      = d.desvioPadrao.valores[i]  ?? '–';
-              const homog   = d.homogeneidade.valores[i] ?? '–';
-              return `
-                <tr>
-                  <td style="font-weight:700;color:var(--blue-dark);">${c.nome}</td>
-                  <td><span class="${parseFloat(media)>=7?'nota-alta':parseFloat(media)>=5?'nota-media':'nota-baixa'}">${media}</span></td>
-                  <td>${mediana}</td>
-                  <td>${vari}</td>
-                  <td>${dp}</td>
-                  <td>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                      <div style="width:50px;height:5px;background:var(--border-color);border-radius:99px;overflow:hidden;">
-                        <div style="width:${homog}%;height:100%;background:${homog>75?'var(--green)':homog>55?'var(--yellow)':'var(--red)'};border-radius:99px;"></div>
-                      </div>
-                      <span style="font-size:.8rem;">${homog}%</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="badge ${c.risco==='alto'?'badge-red':c.risco==='medio'?'badge-yellow':'badge-green'}">
-                      ${c.risco==='alto'?'🔴 Alto':c.risco==='medio'?'🟡 Médio':'🟢 Baixo'}
-                    </span>
-                  </td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  bindTooltips(wrapper);
-  renderCharts(MOCK_DATA.estatisticas, 'est-');
 }
 
 /* ─── Helpers ────────────────────────────────────────────────── */
@@ -297,11 +235,11 @@ function makeRegistrosCard(reg) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
         <div style="background:var(--bg-page);border-radius:8px;padding:10px;text-align:center;border:1px solid var(--border-color);">
-          <div style="font-family:'Montserrat',sans-serif;font-size:1.3rem;font-weight:800;color:var(--blue-primary);">${reg.filtrado.toLocaleString('pt-BR')}</div>
+          <div style="font-family: 'Poppins', sans-serif;font-size:1.3rem;font-weight:800;color:var(--blue-primary);">${reg.filtrado.toLocaleString('pt-BR')}</div>
           <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px;">Filtro Atual</div>
         </div>
         <div style="background:var(--bg-page);border-radius:8px;padding:10px;text-align:center;border:1px solid var(--border-color);">
-          <div style="font-family:'Montserrat',sans-serif;font-size:1.3rem;font-weight:800;color:var(--green);">${reg.periodos.length}</div>
+          <div style="font-family: 'Poppins', sans-serif;font-size:1.3rem;font-weight:800;color:var(--green);">${reg.periodos.length}</div>
           <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px;">Períodos</div>
         </div>
       </div>
@@ -434,3 +372,4 @@ function renderCharts(data, prefix) {
     });
   }
 }
+

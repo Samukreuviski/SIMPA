@@ -4,116 +4,146 @@
  * Role-based: admin/gestao veem tudo; academico vê apenas suas turmas.
  */
 
-import { state }                    from '../state.js';
+import { state } from '../state.js';
 import { getRiscoBadge, fmtNum, fmtPct, fmtNota } from '../utils.js';
-import { openInterventionModal }    from '../components/InterventionModal.js';
+import { openInterventionModal } from '../components/InterventionModal.js';
 
 export async function renderDashboard(container) {
-  const role  = state.get('currentRole');
-  const kpis  = state.getKpis();
+  const role = state.get('currentRole');
+  const kpis = state.getKpis();
   const turmas = state.getTurmas();
 
   // ─── Label do período ──────────────────────────────────────
   const periodoEl = document.getElementById('greeting-period');
   if (periodoEl) {
     periodoEl.innerHTML = `
-      <span>Período: <strong>26/03/2026 a 26/05/2026</strong></span>
-      <span class="period-badge">Semana 8/12</span>
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:var(--text-main); display:flex; align-items:center;">
+        <strong style="margin-right:6px;">Período:</strong> 26/03/2026 a 26/05/2026
+      </div>
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:var(--text-main); display:flex; flex-direction:column; gap:4px; margin-left:12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <strong>Semana</strong> 6 <span style="font-weight:300; font-size:1.15rem; color:var(--text-main);">|</span> 12
+        </div>
+        <div style="display:flex; width:100%; height:6px; border-radius:4px; overflow:hidden;">
+          <div style="width:50%; background:var(--green);"></div>
+          <div style="width:50%; background:var(--green); opacity:0.3;"></div>
+        </div>
+      </div>
     `;
   }
 
   // ─── Label de visão ───────────────────────────────────────
-  const isAdmin   = role === 'admin';
-  const isGestao  = role === 'gestao';
+  const isAdmin = role === 'admin';
+  const isGestao = role === 'gestao';
   const isAcademic = role === 'academico';
 
   const sectionLabel = isAdmin
     ? 'Todas as Turmas em Risco (Visão Global)'
     : isGestao
-    ? 'Meus Cursos em Risco (Visão Geral)'
-    : 'Minhas Turmas em Risco (Visão Geral)';
+      ? 'Meus Cursos em Risco (Visão Geral)'
+      : 'Minhas Turmas em Risco (Visão Geral)';
 
-  // ─── KPI Cards ────────────────────────────────────────────
-  const kpiCards = [
-    {
-      label: isAcademic ? 'Total de Alunos' : 'Total de Alunos',
-      value: fmtNum(kpis.totalAlunos),
-      desc:  `${fmtNum(kpis.turmasAtivas)} turmas ativas`,
-      color: '',
-      icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>`,
-    },
-    {
-      label: 'Em Risco',
-      value: fmtNum(kpis.emRisco),
-      desc:  `${((kpis.emRisco / kpis.totalAlunos) * 100).toFixed(1)}% do total`,
-      color: 'kpi-red',
-      valueColor: 'red',
-      icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-        <line x1="12" y1="9" x2="12" y2="13"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>`,
-    },
-    {
-      label: 'Taxa de Aprovação',
-      value: fmtPct(kpis.taxaAprovacao),
-      desc:  kpis.taxaAprovacao >= 75 ? '✅ Acima da meta (75%)' : '⚠️ Abaixo da meta (75%)',
-      color: kpis.taxaAprovacao >= 75 ? 'kpi-green' : 'kpi-yellow',
-      valueColor: kpis.taxaAprovacao >= 75 ? 'green' : 'yellow',
-      icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <polyline points="20 6 9 17 4 12"/>
-      </svg>`,
-    },
-    {
-      label: isAcademic ? 'Disciplinas Ativas' : 'Cursos Ativos',
-      value: isAcademic ? fmtNum(kpis.turmasAtivas) : fmtNum(kpis.cursosAtivos),
-      desc:  `Frequência média: ${fmtPct(kpis.taxaFrequencia)}`,
-      color: '',
-      icon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-      </svg>`,
-    },
-  ];
+  // ─── KPI Cards (Personalizados conforme design Figma) ───────────
+  // Calcula uma média geral simulada a partir das turmas
+  const mediaGeral = (turmas.reduce((acc, t) => acc + t.mediaGeral, 0) / (turmas.length || 1)).toFixed(1);
+
+  const customKpiHtml = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px;">
+      <!-- Card 1: Média Geral -->
+      <div style="background:var(--bg-card); border-radius:35px; padding:32px 36px; box-shadow:var(--shadow-md); position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:220px; transition:background 0.2s;">
+        <div style="position:absolute; top:28px; left:36px; font-family:'Poppins', sans-serif; font-size:1.15rem; font-weight:600; color:var(--text-main); line-height:1.2; white-space:nowrap;">
+          ${isGestao ? 'Média geral dos cursos' : 'Média geral das minhas turmas'}
+        </div>
+        <div style="position:absolute; top:28px; right:36px; background:var(--blue-primary); color:var(--bg-page); border-radius:4px; padding:6px 14px; font-family:'Poppins', sans-serif; font-size:.95rem; font-weight:600;">
+          Alvo: 7.5
+        </div>
+        <div style="font-family:'Poppins', sans-serif; font-size:5.5rem; font-weight:700; color:var(--blue-primary); line-height:1; margin-top:20px;">
+          ${mediaGeral}/10
+        </div>
+        <div style="font-family:'Poppins', sans-serif; font-size:.85rem; font-weight:600; color:var(--text-main); margin-top:10px;">
+          Leve Alta vs. Semana Anterior (+0.2)
+        </div>
+      </div>
+
+      <!-- Card 2: Frequência Média -->
+      <div style="background:var(--bg-card); border-radius:35px; padding:32px 36px; box-shadow:var(--shadow-md); position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:220px; transition:background 0.2s;">
+        <div style="position:absolute; top:28px; left:36px; font-family:'Poppins', sans-serif; font-size:1.15rem; font-weight:600; color:var(--text-main); line-height:1.2; white-space:nowrap;">
+          Frequência Média de Alunos
+        </div>
+        <div style="font-family:'Poppins', sans-serif; font-size:5.5rem; font-weight:700; color:var(--blue-primary); line-height:1; margin-top:20px;">
+          ${fmtPct(kpis.taxaFrequencia, 0)}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; font-family:'Poppins', sans-serif; font-size:.85rem; font-weight:600; color:var(--text-main); margin-top:10px;">
+          Estável <span style="width:12px; height:12px; background:var(--green); border-radius:50%; display:inline-block;"></span>
+        </div>
+      </div>
+    </div>
+  `;
 
   // ─── Turma rows (tabela) ───────────────────────────────────
-  const turmasRows = turmas.map(t => {
+  const turmasRows = turmas.map((t, index) => {
     const pctRisco = ((t.emRisco / t.alunos) * 100).toFixed(0);
-    const freqLabel = t.taxaFreq >= 85 ? 'Alta' : t.taxaFreq >= 75 ? 'Média' : 'Baixa';
-    const freqColor = t.taxaFreq >= 85 ? 'var(--green)' : t.taxaFreq >= 75 ? 'var(--yellow)' : 'var(--red)';
+
+    // Frequência
+    let freqLabel = 'Alta';
+    let freqIcon = '▲';
+    let freqColor = 'var(--green)'; // Green
+    if (t.taxaFreq < 75) {
+      freqLabel = 'Baixa';
+      freqIcon = '▼';
+      freqColor = 'var(--red)';
+    } else if (t.taxaFreq < 85) {
+      freqLabel = 'Média';
+      freqIcon = '▲';
+      freqColor = 'var(--yellow)';
+    }
+
+    // Média
+    let mediaColor = 'var(--green)';
+    if (t.mediaGeral < 5) mediaColor = 'var(--red)';
+    else if (t.mediaGeral < 7) mediaColor = 'var(--yellow)';
+
+    // Status
+    let statusLabel = 'Risco Baixo';
+    let statusColor = 'var(--green)';
+    if (t.risco === 'alto') {
+      statusLabel = 'Risco alto';
+      statusColor = 'var(--red)';
+    } else if (t.risco === 'medio') {
+      statusLabel = 'Risco Médio';
+      statusColor = 'var(--yellow)';
+    }
+
+    const solidEnvelope = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z"/></svg>`;
 
     return `
-      <tr>
-        <td style="font-weight:700;color:var(--blue-dark);">
+      <tr style="background: ${index % 2 === 0 ? 'var(--bg-page)' : 'var(--bg-card)'};">
+        <td style="font-weight:600; color:var(--text-strong); padding:16px;">
           ${isGestao ? t.cursoId : t.nome.replace(' — ', ' ')}
         </td>
-        <td>${fmtNum(t.alunos)}</td>
-        <td>
-          <span style="color:${t.emRisco > 10 ? 'var(--red)' : 'var(--yellow)'}; font-weight:700;">
-            ${fmtNum(t.emRisco)} alunos (${pctRisco}%)
-          </span>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          ${fmtNum(t.alunos)}
         </td>
-        <td style="color:${freqColor}; font-weight:700;">
-          ${fmtPct(t.taxaFreq, 0)} <small style="font-weight:400;color:var(--text-muted);">(${freqLabel})</small>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          ${fmtNum(t.emRisco)} alunos (${pctRisco}%)
         </td>
-        <td>
-          <span style="color:var(--blue-dark);font-weight:700;">${fmtNota(t.mediaGeral)}</span>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          ${fmtPct(t.taxaFreq, 0)} <span style="color:${freqColor}; font-size:.85rem; margin-left:2px;">${freqIcon}</span><span style="font-weight:500; color:var(--text-strong); margin-left:2px;">(${freqLabel})</span>
         </td>
-        <td>${getRiscoBadge(t.risco)}</td>
-        <td>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          <span style="color:${mediaColor}; font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;"></span>${fmtNota(t.mediaGeral)}
+        </td>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          <span style="color:${statusColor}; font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;">●</span>${statusLabel}
+        </td>
+        <td style="text-align:center; padding:16px;">
           ${t.risco !== 'baixo' ? `
-            <button class="btn-intervene btn-intervene-turma" data-turma="${t.id}"
-                    style="font-size:.72rem;padding:5px 10px;border:none;cursor:pointer;border-radius:6px;
-                    background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;font-weight:700;
-                    display:inline-flex;align-items:center;gap:4px;">
-              ✉️ Intervir
-            </button>
-          ` : '<span style="color:var(--text-muted);font-size:.75rem;">—</span>'}
+          <button class="btn-intervene btn-intervene-turma" data-turma="${t.id}"
+                  style="background:transparent; color:var(--text-strong); border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; transition:transform 0.2s;"
+                  onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+            ${solidEnvelope}
+          </button>
+          ` : ''}
         </td>
       </tr>
     `;
@@ -123,41 +153,26 @@ export async function renderDashboard(container) {
   container.innerHTML = `
     <div class="page-fade-in">
 
-      <!-- KPI Grid -->
-      <div class="kpi-grid">
-        ${kpiCards.map(k => `
-          <div class="kpi-card ${k.color}">
-            <div class="kpi-icon">${k.icon}</div>
-            <div class="kpi-label">${k.label}</div>
-            <div class="kpi-value ${k.valueColor || ''}">${k.value}</div>
-            <div class="kpi-desc">${k.desc}</div>
-          </div>
-        `).join('')}
-      </div>
-
-      <!-- Detalhamento btn + label -->
-      <div class="section-header" style="margin-bottom:14px;">
-        <div class="section-title">
-          📋 ${sectionLabel}
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span style="font-size:.78rem;color:var(--text-muted);">${turmas.length} turmas encontradas</span>
-        </div>
-      </div>
+      <!-- KPI Grid Customizado -->
+      ${customKpiHtml}
 
       <!-- Turmas Table -->
-      <div class="section-card" style="padding:0;overflow:hidden;">
-        <div class="table-wrap">
-          <table id="turmas-table">
+      <div style="background:var(--bg-card); border-radius:12px; overflow:hidden; border:1px solid var(--border-color); margin-top:24px;">
+        <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-family:'Poppins', sans-serif; font-size:1.15rem; font-weight:700; color:var(--text-main);">${sectionLabel}</div>
+          <div style="font-family:'Poppins', sans-serif; font-size:.85rem; color:var(--text-muted);">${turmas.length} turmas encontradas</div>
+        </div>
+        <div class="table-wrap" style="width:100%; overflow-x:auto;">
+          <table id="turmas-table" style="width:100%; border-collapse:collapse; min-width:800px; font-family:'Poppins', sans-serif;">
             <thead>
-              <tr>
-                <th>${isGestao ? 'Curso' : 'Turma'}</th>
-                <th>Total de Alunos</th>
-                <th>Alunos em Risco</th>
-                <th>Frequência</th>
-                <th>Média</th>
-                <th>Status</th>
-                <th>Intervir</th>
+              <tr style="background:var(--blue-primary); color:var(--bg-page);">
+                <th style="padding:16px; text-align:left; font-weight:600; font-size:1.05rem;">${isGestao ? 'Curso:' : 'Turma:'}</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Total de Alunos:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Alunos em Risco:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Frequência:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Média:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Status:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Intervir</th>
               </tr>
             </thead>
             <tbody>${turmasRows}</tbody>
@@ -169,43 +184,42 @@ export async function renderDashboard(container) {
       <!-- Grade Visual de Turmas -->
       <div style="margin-top:24px;">
         <div class="section-header">
-          <div class="section-title">🗂️ Grade Visual de Turmas</div>
+          <div class="section-title">Grade Visual de Turmas</div>
         </div>
         <div class="turma-grid" id="turma-grid">
           ${turmas.map(t => `
             <div class="turma-card ${t.risco === 'alto' ? 'risco-alto' : t.risco === 'medio' ? 'risco-medio' : 'risco-baixo'}">
               <div class="turma-card-header">
-                <div>
+                <div style="flex:1; padding-right:8px;">
                   <div class="turma-card-nome">${t.nome.split('—')[0].trim()}</div>
                   <div class="turma-card-serie">${t.serie} · ${t.professor}</div>
                 </div>
-                ${getRiscoBadge(t.risco)}
+                <div style="white-space:nowrap; flex-shrink:0;">
+                  ${getRiscoBadge(t.risco)}
+                </div>
               </div>
               <div class="turma-card-stats">
                 <div class="turma-stat">
-                  <span class="turma-stat-val">${fmtNum(t.alunos)}</span>
+                  <span class="turma-stat-val" style="color:var(--text-strong);">${fmtNum(t.alunos)}</span>
                   <span class="turma-stat-label">Alunos</span>
                 </div>
                 <div class="turma-stat">
-                  <span class="turma-stat-val" style="color:var(--red);">${fmtNum(t.emRisco)}</span>
+                  <span class="turma-stat-val" style="color:var(--text-strong);"><span style="color:var(--red); font-size:.9rem; line-height:0; margin-right:2px;">●</span>${fmtNum(t.emRisco)}</span>
                   <span class="turma-stat-label">Em Risco</span>
                 </div>
                 <div class="turma-stat">
-                  <span class="turma-stat-val">${fmtNota(t.mediaGeral)}</span>
+                  <span class="turma-stat-val" style="color:var(--text-strong);"><span style="color:${t.mediaGeral < 5 ? 'var(--red)' : t.mediaGeral < 7 ? 'var(--yellow)' : 'var(--green)'}; font-size:.9rem; line-height:0; margin-right:2px;">●</span>${fmtNota(t.mediaGeral)}</span>
                   <span class="turma-stat-label">Média</span>
                 </div>
                 <div class="turma-stat">
-                  <span class="turma-stat-val">${fmtPct(t.taxaFreq, 0)}</span>
+                  <span class="turma-stat-val" style="color:var(--text-strong);"><span style="color:${t.taxaFreq < 75 ? 'var(--red)' : t.taxaFreq < 85 ? 'var(--yellow)' : 'var(--green)'}; font-size:.9rem; line-height:0; margin-right:2px;">●</span>${fmtPct(t.taxaFreq, 0)}</span>
                   <span class="turma-stat-label">Freq.</span>
                 </div>
               </div>
               <div class="turma-card-footer">
                 ${t.risco !== 'baixo' ? `
-                  <button class="btn-intervene btn-intervene-turma" data-turma="${t.id}"
-                          style="border:none;cursor:pointer;">
-                    ✉️ Gerar Intervenção
-                  </button>
-                ` : `<span style="color:var(--green);font-size:.75rem;font-weight:600;">✅ Situação OK</span>`}
+                  <span style="color:var(--blue-primary); font-size:.85rem; font-weight:600; font-family:'Poppins', sans-serif;">Precisa de intervenção</span>
+                ` : `<span style="color:var(--blue-primary); font-size:.85rem; font-weight:600; font-family:'Poppins', sans-serif;">Situação OK</span>`}
               </div>
             </div>
           `).join('')}
@@ -220,8 +234,8 @@ export async function renderDashboard(container) {
   container.querySelectorAll('.btn-intervene-turma').forEach(btn => {
     btn.addEventListener('click', () => {
       const turmaId = btn.dataset.turma;
-      const turma   = state.getTurmas().find(t => t.id === turmaId);
-      const alunos  = state.getAlunos(turmaId).filter(a => a.risco !== 'baixo');
+      const turma = state.getTurmas().find(t => t.id === turmaId);
+      const alunos = state.getAlunos(turmaId).filter(a => a.risco !== 'baixo');
       if (alunos.length > 0) {
         // Abre intervenção para o primeiro aluno em risco da turma
         openInterventionModal(alunos[0], turmaId);
@@ -229,3 +243,4 @@ export async function renderDashboard(container) {
     });
   });
 }
+

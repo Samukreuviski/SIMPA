@@ -109,3 +109,4 @@ class AppState extends EventTarget {
 }
 
 export const state = new AppState();
+

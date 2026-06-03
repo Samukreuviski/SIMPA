@@ -56,10 +56,20 @@ export async function renderPredicao(container) {
   // Reset period label
   const periodoEl = document.getElementById('greeting-period');
   if (periodoEl) {
-    periodoEl.innerHTML = `
-      <span>Período: <strong>26/03/2026 a 26/05/2026</strong></span>
-      <span class="period-badge">Semana 8/12</span>
-    `;
+      periodoEl.innerHTML = `
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:#003D61; display:flex; align-items:center;">
+        <strong style="margin-right:6px;">Período:</strong> 26/03/2026 a 26/05/2026
+      </div>
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:#003D61; display:flex; flex-direction:column; gap:4px; margin-left:12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <strong>Semana</strong> 6 <span style="font-weight:300; font-size:1.15rem; color:#003D61;">|</span> 12
+        </div>
+        <div style="display:flex; width:100%; height:6px; border-radius:4px; overflow:hidden;">
+          <div style="width:50%; background:#198c19;"></div>
+          <div style="width:50%; background:#9cd79c;"></div>
+        </div>
+      </div>
+      `;
   }
 
   container.innerHTML = `
@@ -241,11 +251,11 @@ function makeStatCountCard(registros) {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div style="background:var(--bg-page);border-radius:8px;padding:12px;text-align:center;border:1px solid var(--border-color);">
-            <div style="font-family:'Montserrat',sans-serif;font-size:1.4rem;font-weight:800;color:var(--blue-primary);">${registros.filtrado.toLocaleString('pt-BR')}</div>
+            <div style="font-family: 'Poppins', sans-serif;font-size:1.4rem;font-weight:800;color:var(--blue-primary);">${registros.filtrado.toLocaleString('pt-BR')}</div>
             <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">Filtro Atual</div>
           </div>
           <div style="background:var(--bg-page);border-radius:8px;padding:12px;text-align:center;border:1px solid var(--border-color);">
-            <div style="font-family:'Montserrat',sans-serif;font-size:1.4rem;font-weight:800;color:var(--green);">${registros.periodos.length}</div>
+            <div style="font-family: 'Poppins', sans-serif;font-size:1.4rem;font-weight:800;color:var(--green);">${registros.periodos.length}</div>
             <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">Períodos</div>
           </div>
         </div>
@@ -457,3 +467,4 @@ async function renderCharts(data) {
     });
   }
 }
+

@@ -70,3 +70,4 @@ export class Router {
     container.parentElement?.scrollTo(0, 0);
   }
 }
+

@@ -31,9 +31,9 @@ export function openInterventionModal(aluno, turmaId = null) {
   const motivoInicial = aluno.motivoRisco || 'geral';
 
   const tabsConfig = [
-    { key: 'faltas', label: '⚠️ Excesso de Faltas' },
-    { key: 'notas',  label: '📊 Notas Baixas' },
-    { key: 'geral',  label: '🎯 Risco Geral' },
+    { key: 'faltas', label: 'Excesso de Faltas' },
+    { key: 'notas',  label: 'Notas Baixas' },
+    { key: 'geral',  label: 'Risco Geral' },
   ];
 
   const bodyHtml = `
@@ -64,7 +64,7 @@ export function openInterventionModal(aluno, turmaId = null) {
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px;">
         <span style="font-size:.75rem;color:var(--text-muted);">
-          ✏️ Edite a mensagem antes de enviar se necessário
+          Edite a mensagem antes de enviar se necessário
         </span>
         <span id="char-count" style="font-size:.72rem;color:var(--text-muted);">
           ${templates[motivoInicial].length} caracteres
@@ -75,7 +75,7 @@ export function openInterventionModal(aluno, turmaId = null) {
 
   const footerHtml = `
     <button class="btn btn-outline" id="btn-copy-msg" style="flex:1;">
-      📋 Copiar Mensagem
+      Copiar Mensagem
     </button>
     <button class="whatsapp-btn" id="btn-whatsapp" style="flex:1;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -87,7 +87,7 @@ export function openInterventionModal(aluno, turmaId = null) {
   `;
 
   const { el } = openModal({
-    title: `💬 Gerar Intervenção — ${aluno.nome.split(' ')[0]}`,
+    title: `Gerar Intervenção — ${aluno.nome.split(' ')[0]}`,
     body: bodyHtml,
     footer: footerHtml,
     size: 'modal-lg',
@@ -119,9 +119,9 @@ export function openInterventionModal(aluno, turmaId = null) {
       const text = el.querySelector('#msg-content')?.value || '';
       try {
         await navigator.clipboard.writeText(text);
-        showToast('✅ Mensagem copiada para a área de transferência!', 'success');
+        showToast('Mensagem copiada para a área de transferência!', 'success');
       } catch {
-        showToast('❌ Não foi possível copiar — selecione e copie manualmente.', 'error');
+        showToast('Não foi possível copiar — selecione e copie manualmente.', 'error');
       }
     });
 
@@ -135,10 +135,11 @@ export function openInterventionModal(aluno, turmaId = null) {
 
 function getRiscoBadgeInline(risco) {
   const map = {
-    alto:  ['badge-red',    '🔴 Alto'],
-    medio: ['badge-yellow', '🟡 Médio'],
-    baixo: ['badge-green',  '🟢 Baixo'],
+    alto:  ['badge-red',    '&bull; Alto'],
+    medio: ['badge-yellow', '&bull; Médio'],
+    baixo: ['badge-green',  '&bull; Baixo'],
   };
   const [cls, label] = map[risco] || ['badge-gray', '–'];
   return `<span class="badge ${cls}">${label}</span>`;
 }
+
