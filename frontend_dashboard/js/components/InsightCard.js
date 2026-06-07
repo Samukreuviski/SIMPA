@@ -9,3 +9,4 @@ function InsightCard({ text, icon = '💡' }) {
 }
 
 window.InsightCard = InsightCard;
+

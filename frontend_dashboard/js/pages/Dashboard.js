@@ -1,182 +1,246 @@
-/** Dashboard.js — Visão Geral com dados reais da API */
-const { useState: useStateD, useEffect: useEffectD, useRef: useRefD } = React;
+/**
+ * Dashboard.js — Predicta
+ * Visão Geral: KPIs + grade de turmas ativas (sem gráfico de linha).
+ * Role-based: admin/gestao veem tudo; academico vê apenas suas turmas.
+ */
 
-function Dashboard() {
-  const [stats,   setStats]   = useStateD(null);
-  const [gerais,  setGerais]  = useStateD(null);
-  const [turmas,  setTurmas]  = useStateD({});  // { turma: { medias, risco } }
-  const [loading, setLoading] = useStateD(true);
-  const [erro,    setErro]    = useStateD(false);
-  const donutRef  = useRefD(null);
-  const donutInst = useRefD(null);
+import { state } from '../state.js';
+import { getRiscoBadge, fmtNum, fmtPct, fmtNota } from '../utils.js';
+import { openInterventionModal } from '../components/InterventionModal.js';
 
-  useEffectD(() => {
-    Promise.all([
-      API.getEstatisticasAvancadas(),
-      API.getEstatisticasGerais(),
-      API.getAllBoletins(),
-    ]).then(([adv, ger, boletins]) => {
-      if (!adv && !ger) { setErro(true); setLoading(false); return; }
-      setStats(adv);
-      setGerais(ger);
+export async function renderDashboard(container) {
+  const role = state.get('currentRole');
+  const kpis = state.getKpis();
+  const turmas = state.getTurmas();
 
-      // Agrupar boletins por turma para o card de qualidade
-      const map = {};
-      boletins.forEach(b => {
-        b.boletim.forEach(reg => {
-          const turma = reg.turma || 'S/T';
-          if (!map[turma]) map[turma] = { medias: [], reprovados: 0, total: 0 };
-          const media = Utils.calcMedia(reg);
-          map[turma].medias.push(media);
-          map[turma].total++;
-          if (reg.situacao !== 'Aprovado') map[turma].reprovados++;
-        });
-      });
-      setTurmas(map);
-      setLoading(false);
-    }).catch(() => { setErro(true); setLoading(false); });
-  }, []);
-
-  // Donut chart das situações
-  useEffectD(() => {
-    if (!gerais || !donutRef.current) return;
-    if (donutInst.current) donutInst.current.destroy();
-    const sit = gerais.indicadores_de_situacao || {};
-    const labels = Object.keys(sit);
-    const values = Object.values(sit);
-    const colors = labels.map(l => {
-      if (l === 'Aprovado')            return '#22C55E';
-      if (l === 'Reprovado')           return '#EF4444';
-      if (l === 'Reprovado por Falta') return '#F97316';
-      if (l === 'Cursando')            return '#3AADE5';
-      return '#94A3B8';
-    });
-    donutInst.current = new Chart(donutRef.current, {
-      type: 'doughnut',
-      data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }] },
-      options: {
-        cutout: '68%',
-        plugins: {
-          legend: { position: 'bottom', labels: { padding: 14, font: { size: 12 }, usePointStyle: true } },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} alunos` } }
-        },
-        animation: { animateScale: true, duration: 600 }
-      }
-    });
-    return () => { if (donutInst.current) donutInst.current.destroy(); };
-  }, [gerais]);
-
-  if (loading) return <LoadingState type="page" />;
-  if (erro) return <EmptyState title="Erro ao carregar dados" desc="Verifique se o servidor está rodando." onRetry={() => location.reload()} />;
-
-  const q   = stats?.estatisticas_descritivas?.notas_quartis || {};
-  const dp  = stats?.estatisticas_descritivas?.desvio_padrao || 0;
-  const totalReg  = gerais?.total_registros_analisados || 0;
-  const retencao  = stats?.kpis_desempenho?.indice_retencao_alunos_pct ?? 0;
-  const reprovacao= stats?.kpis_desempenho?.taxa_reprovacao_geral_pct ?? 0;
-  const q1 = q.Q1 || 0, q2 = q.Q2 || 0, q3 = q.Q3 || 0, iqr = q.IQR || 0;
-
-  const segs = [
-    { label: 'Zona Crítica',  color: '#EF4444', start: 0,   end: q1  },
-    { label: 'Zona Baixa',    color: '#F97316', start: q1,  end: q2  },
-    { label: 'Zona Média',    color: '#3AADE5', start: q2,  end: q3  },
-    { label: 'Zona Boa',      color: '#22C55E', start: q3,  end: 100 },
-  ];
-
-  // Top 6 turmas por quantidade de alunos
-  const turmaKeys = Object.keys(turmas).sort((a, b) => turmas[b].total - turmas[a].total).slice(0, 6);
-
-  return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">{Utils.saudacao()}, Predicta 👋</h1>
-        <p className="page-subtitle">Acompanhe os indicadores institucionais em tempo real.</p>
+  // ─── Label do período ──────────────────────────────────────
+  const periodoEl = document.getElementById('greeting-period');
+  if (periodoEl) {
+    periodoEl.innerHTML = `
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:var(--text-main); display:flex; align-items:center;">
+        <strong style="margin-right:6px;">Período:</strong> 26/03/2026 a 26/05/2026
       </div>
-
-      {/* KPIs reais */}
-      <div className="kpi-grid">
-        <KpiCard label="Total de Registros" value={totalReg} desc="Registros acadêmicos analisados"
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
-        />
-        <KpiCard label="Índice de Retenção" value={`${retencao}%`} desc="Alunos retidos no período" variant="green"
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>}
-        />
-        <KpiCard label="Taxa de Reprovação" value={`${reprovacao}%`} desc="Reprovados e reprovados por falta" variant="red"
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>}
-        />
-        <KpiCard label="Desvio Padrão" value={Utils.fmt2(dp)} desc="Dispersão das notas (σ)" variant="yellow"
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>}
-        />
-      </div>
-
-      {/* Gráficos */}
-      <div className="charts-grid">
-        <div className="chart-card">
-          <div className="chart-title">Distribuição de Quartis</div>
-          <div className="chart-subtitle">Q1 · Mediana · Q3 das notas reais</div>
-          <div className="quartile-bar-wrap">
-            <div className="quartile-bar">
-              {segs.map(s => (
-                <div key={s.label} className="quartile-segment"
-                  style={{ width: `${Math.max(s.end - s.start, 0)}%`, background: s.color }}
-                  title={`${s.label}: ${s.start.toFixed(1)}–${s.end.toFixed(1)}`}
-                />
-              ))}
-            </div>
-            <div className="quartile-labels">
-              {[{val:q1,name:'Q1'},{val:q2,name:'Q2 (Mediana)',cls:'blue'},{val:q3,name:'Q3',cls:'green'},{val:iqr,name:'IQR'}].map(x => (
-                <div key={x.name} className="ql-item">
-                  <div className="ql-val" style={x.cls==='blue'?{color:'var(--blue-light)'}:x.cls==='green'?{color:'var(--green)'}:{}}>{Utils.fmt2(x.val)}</div>
-                  <div className="ql-name">{x.name}</div>
-                </div>
-              ))}
-            </div>
-            <div className="quartile-legend">
-              {segs.map(s => (
-                <div key={s.label} className="ql-legend-item">
-                  <span className="ql-dot" style={{ background: s.color }} />{s.label}
-                </div>
-              ))}
-            </div>
-          </div>
-          <InsightCard text={`A mediana de ${Utils.fmt2(q2)} indica que metade dos alunos possui nota igual ou superior a este valor. IQR de ${Utils.fmt2(iqr)} representa a dispersão central da distribuição.`} />
+      <div style="font-family:'Poppins', sans-serif; font-size:1.05rem; color:var(--text-main); display:flex; flex-direction:column; gap:4px; margin-left:12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <strong>Semana</strong> 6 <span style="font-weight:300; font-size:1.15rem; color:var(--text-main);">|</span> 12
         </div>
+        <div style="display:flex; width:100%; height:6px; border-radius:4px; overflow:hidden;">
+          <div style="width:50%; background:var(--green);"></div>
+          <div style="width:50%; background:var(--green); opacity:0.3;"></div>
+        </div>
+      </div>
+    `;
+  }
 
-        <div className="chart-card">
-          <div className="chart-title">Distribuição de Situações</div>
-          <div className="chart-subtitle">Dados reais do banco acadêmico</div>
-          <div className="chart-canvas-wrap"><canvas ref={donutRef} id="donut-chart" /></div>
+  // ─── Label de visão ───────────────────────────────────────
+  const isAdmin = role === 'admin';
+  const isGestao = role === 'gestao';
+  const isAcademic = role === 'academico';
+
+  const sectionLabel = isAdmin
+    ? 'Todas as Turmas em Risco (Visão Global)'
+    : isGestao
+      ? 'Meus Cursos em Risco (Visão Geral)'
+      : 'Minhas Turmas em Risco (Visão Geral)';
+
+  // ─── KPI Cards (Personalizados conforme design Figma) ───────────
+  // Calcula uma média geral simulada a partir das turmas
+  const mediaGeral = (turmas.reduce((acc, t) => acc + t.mediaGeral, 0) / (turmas.length || 1)).toFixed(1);
+
+  const customKpiHtml = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px;">
+      <!-- Card 1: Média Geral -->
+      <div style="background:var(--bg-card); border-radius:35px; padding:32px 36px; box-shadow:var(--shadow-md); position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:220px; transition:background 0.2s;">
+        <div style="position:absolute; top:28px; left:36px; font-family:'Poppins', sans-serif; font-size:1.15rem; font-weight:600; color:var(--text-main); line-height:1.2; white-space:nowrap;">
+          ${isGestao ? 'Média geral dos cursos' : 'Média geral das minhas turmas'}
+        </div>
+        <div style="position:absolute; top:28px; right:36px; background:var(--blue-primary); color:var(--bg-page); border-radius:4px; padding:6px 14px; font-family:'Poppins', sans-serif; font-size:.95rem; font-weight:600;">
+          Alvo: 7.5
+        </div>
+        <div style="font-family:'Poppins', sans-serif; font-size:5.5rem; font-weight:700; color:var(--blue-primary); line-height:1; margin-top:20px;">
+          ${mediaGeral}/10
+        </div>
+        <div style="font-family:'Poppins', sans-serif; font-size:.85rem; font-weight:600; color:var(--text-main); margin-top:10px;">
+          Leve Alta vs. Semana Anterior (+0.2)
         </div>
       </div>
 
-      {/* Qualidade das Turmas — dados reais dos boletins */}
-      <div className="section-card">
-        <div className="section-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-light)" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          Indicadores de Qualidade das Turmas
+      <!-- Card 2: Frequência Média -->
+      <div style="background:var(--bg-card); border-radius:35px; padding:32px 36px; box-shadow:var(--shadow-md); position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:220px; transition:background 0.2s;">
+        <div style="position:absolute; top:28px; left:36px; font-family:'Poppins', sans-serif; font-size:1.15rem; font-weight:600; color:var(--text-main); line-height:1.2; white-space:nowrap;">
+          Frequência Média de Alunos
         </div>
-        {turmaKeys.length === 0 ? (
-          <EmptyState title="Dados de turmas não disponíveis" desc="Nenhum boletim encontrado." />
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:14 }}>
-            {turmaKeys.map(t => {
-              const td = turmas[t];
-              const mediaT = td.medias.length > 0 ? td.medias.reduce((a,b)=>a+b,0)/td.medias.length : 0;
-              return (
-                <div key={t} style={{ background:'var(--gray-bg)', borderRadius:8, padding:'14px 16px', border:'1px solid var(--gray-border)' }}>
-                  <div style={{ fontWeight:600, fontSize:'.88rem', marginBottom:6 }}>Turma {t}</div>
-                  <div style={{ fontSize:'1.2rem', fontWeight:700, fontFamily:'Roboto Mono,monospace', color: Utils.notaColor(mediaT) }}>{mediaT.toFixed(1)}</div>
-                  <div style={{ fontSize:'.72rem', color:'var(--gray-text)', marginBottom:8 }}>Média — {td.total} registros</div>
-                  <span className={`badge ${td.reprovados===0?'green':td.reprovados<=2?'yellow':'red'}`}>{td.reprovados} reprovados</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <InsightCard icon="📊" text={`Q1 = ${Utils.fmt2(q1)} e Q3 = ${Utils.fmt2(q3)}: 50% dos alunos concentram-se nesta faixa. Desvio padrão de ${Utils.fmt2(dp)} indica ${dp<10?'baixa':'moderada a alta'} variabilidade entre alunos.`} />
+        <div style="font-family:'Poppins', sans-serif; font-size:5.5rem; font-weight:700; color:var(--blue-primary); line-height:1; margin-top:20px;">
+          ${fmtPct(kpis.taxaFrequencia, 0)}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; font-family:'Poppins', sans-serif; font-size:.85rem; font-weight:600; color:var(--text-main); margin-top:10px;">
+          Estável <span style="width:12px; height:12px; background:var(--green); border-radius:50%; display:inline-block;"></span>
+        </div>
       </div>
     </div>
-  );
+  `;
+
+  // ─── Turma rows (tabela) ───────────────────────────────────
+  const turmasRows = turmas.map((t, index) => {
+    const pctRisco = ((t.emRisco / t.alunos) * 100).toFixed(0);
+
+    // Frequência
+    let freqLabel = 'Alta';
+    let freqIcon = '▲';
+    let freqColor = 'var(--green)'; // Green
+    if (t.taxaFreq < 75) {
+      freqLabel = 'Baixa';
+      freqIcon = '▼';
+      freqColor = 'var(--red)';
+    } else if (t.taxaFreq < 85) {
+      freqLabel = 'Média';
+      freqIcon = '▲';
+      freqColor = 'var(--yellow)';
+    }
+
+    // Média
+    let mediaColor = 'var(--green)';
+    if (t.mediaGeral < 5) mediaColor = 'var(--red)';
+    else if (t.mediaGeral < 7) mediaColor = 'var(--yellow)';
+
+    // Status
+    let statusLabel = 'Risco Baixo';
+    let statusColor = 'var(--green)';
+    if (t.risco === 'alto') {
+      statusLabel = 'Risco alto';
+      statusColor = 'var(--red)';
+    } else if (t.risco === 'medio') {
+      statusLabel = 'Risco Médio';
+      statusColor = 'var(--yellow)';
+    }
+
+    const solidEnvelope = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z"/></svg>`;
+
+    return `
+      <tr style="background: ${index % 2 === 0 ? 'var(--bg-page)' : 'var(--bg-card)'};">
+        <td style="font-weight:600; color:var(--text-strong); padding:16px;">
+          ${isGestao ? t.cursoId : t.nome.replace(' — ', ' ')}
+        </td>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          ${fmtNum(t.alunos)}
+        </td>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          ${fmtNum(t.emRisco)} alunos (${pctRisco}%)
+        </td>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          ${fmtPct(t.taxaFreq, 0)} <span style="color:${freqColor}; font-size:.85rem; margin-left:2px;">${freqIcon}</span><span style="font-weight:500; color:var(--text-strong); margin-left:2px;">(${freqLabel})</span>
+        </td>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          <span style="color:${mediaColor}; font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;"></span>${fmtNota(t.mediaGeral)}
+        </td>
+        <td style="font-weight:700; color:var(--text-strong); text-align:center; padding:16px;">
+          <span style="color:${statusColor}; font-size:1.2rem; vertical-align:middle; line-height:0; margin-right:4px;">●</span>${statusLabel}
+        </td>
+        <td style="text-align:center; padding:16px;">
+          ${t.risco !== 'baixo' ? `
+          <button class="btn-intervene btn-intervene-turma" data-turma="${t.id}"
+                  style="background:transparent; color:var(--text-strong); border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; transition:transform 0.2s;"
+                  onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+            ${solidEnvelope}
+          </button>
+          ` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // ─── Render HTML ──────────────────────────────────────────
+  container.innerHTML = `
+    <div class="page-fade-in">
+
+      <!-- KPI Grid Customizado -->
+      ${customKpiHtml}
+
+      <!-- Turmas Table -->
+      <div style="background:var(--bg-card); border-radius:12px; overflow:hidden; border:1px solid var(--border-color); margin-top:24px;">
+        <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-family:'Poppins', sans-serif; font-size:1.15rem; font-weight:700; color:var(--text-main);">${sectionLabel}</div>
+          <div style="font-family:'Poppins', sans-serif; font-size:.85rem; color:var(--text-muted);">${turmas.length} turmas encontradas</div>
+        </div>
+        <div class="table-wrap" style="width:100%; overflow-x:auto;">
+          <table id="turmas-table" style="width:100%; border-collapse:collapse; min-width:800px; font-family:'Poppins', sans-serif;">
+            <thead>
+              <tr style="background:var(--blue-primary); color:var(--bg-page);">
+                <th style="padding:16px; text-align:left; font-weight:600; font-size:1.05rem;">${isGestao ? 'Curso:' : 'Turma:'}</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Total de Alunos:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Alunos em Risco:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Frequência:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Média:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Status:</th>
+                <th style="padding:16px; text-align:center; font-weight:600; font-size:1.05rem;">Intervir</th>
+              </tr>
+            </thead>
+            <tbody>${turmasRows}</tbody>
+          </table>
+        </div>
+      </div>
+
+      ${role !== 'gestao' ? `
+      <!-- Grade Visual de Turmas -->
+      <div style="margin-top:24px;">
+        <div class="section-header">
+          <div class="section-title">Grade Visual de Turmas</div>
+        </div>
+        <div class="turma-grid" id="turma-grid">
+          ${turmas.map(t => `
+            <div class="turma-card ${t.risco === 'alto' ? 'risco-alto' : t.risco === 'medio' ? 'risco-medio' : 'risco-baixo'}">
+              <div class="turma-card-header">
+                <div style="flex:1; padding-right:8px;">
+                  <div class="turma-card-nome">${t.nome.split('—')[0].trim()}</div>
+                  <div class="turma-card-serie">${t.serie} · ${t.professor}</div>
+                </div>
+                <div style="white-space:nowrap; flex-shrink:0;">
+                  ${getRiscoBadge(t.risco)}
+                </div>
+              </div>
+              <div class="turma-card-stats">
+                <div class="turma-stat">
+                  <span class="turma-stat-val" style="color:var(--text-strong);">${fmtNum(t.alunos)}</span>
+                  <span class="turma-stat-label">Alunos</span>
+                </div>
+                <div class="turma-stat">
+                  <span class="turma-stat-val" style="color:var(--text-strong);"><span style="color:var(--red); font-size:.9rem; line-height:0; margin-right:2px;">●</span>${fmtNum(t.emRisco)}</span>
+                  <span class="turma-stat-label">Em Risco</span>
+                </div>
+                <div class="turma-stat">
+                  <span class="turma-stat-val" style="color:var(--text-strong);"><span style="color:${t.mediaGeral < 5 ? 'var(--red)' : t.mediaGeral < 7 ? 'var(--yellow)' : 'var(--green)'}; font-size:.9rem; line-height:0; margin-right:2px;">●</span>${fmtNota(t.mediaGeral)}</span>
+                  <span class="turma-stat-label">Média</span>
+                </div>
+                <div class="turma-stat">
+                  <span class="turma-stat-val" style="color:var(--text-strong);"><span style="color:${t.taxaFreq < 75 ? 'var(--red)' : t.taxaFreq < 85 ? 'var(--yellow)' : 'var(--green)'}; font-size:.9rem; line-height:0; margin-right:2px;">●</span>${fmtPct(t.taxaFreq, 0)}</span>
+                  <span class="turma-stat-label">Freq.</span>
+                </div>
+              </div>
+              <div class="turma-card-footer">
+                ${t.risco !== 'baixo' ? `
+                  <span style="color:var(--blue-primary); font-size:.85rem; font-weight:600; font-family:'Poppins', sans-serif;">Precisa de intervenção</span>
+                ` : `<span style="color:var(--blue-primary); font-size:.85rem; font-weight:600; font-family:'Poppins', sans-serif;">Situação OK</span>`}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+    </div>
+  `;
+
+  // ─── Event listeners: botões de intervenção ────────────────
+  container.querySelectorAll('.btn-intervene-turma').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const turmaId = btn.dataset.turma;
+      const turma = state.getTurmas().find(t => t.id === turmaId);
+      const alunos = state.getAlunos(turmaId).filter(a => a.risco !== 'baixo');
+      if (alunos.length > 0) {
+        // Abre intervenção para o primeiro aluno em risco da turma
+        openInterventionModal(alunos[0], turmaId);
+      }
+    });
+  });
 }
 
-window.Dashboard = Dashboard;

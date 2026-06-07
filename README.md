@@ -21,7 +21,7 @@ A base do projeto está sendo construída com as seguintes tecnologias e formato
 * **HTML e CSS**: Estruturação e estilização base preparatória para a futura interface de usuário.
 * **JSON e TXT**: Formatos utilizados para o armazenamento de arquivos, estruturação da base de dados e tráfego de informações na API.
 
-## 👥 Equipe e Papéis
+##  Equipe e Papéis
 O projeto está sendo desenvolvido de forma colaborativa. As principais frentes de atuação da equipe neste ciclo foram organizadas da seguinte forma:
 
 * **Lavínia Carvalhaes (Scrum Master):** Organização do projeto, gerenciamento do backlog, planejamento, levantamento de requisitos e coordenação da arquitetura.

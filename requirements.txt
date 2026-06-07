@@ -1,0 +1,13 @@
+# Dependências do backend Predicta (SIMPA)
+# Instale com: pip install -r requirements.txt
+
+fastapi>=0.110          # framework da API
+uvicorn[standard]>=0.27 # servidor ASGI
+pydantic>=2.6           # validação de dados / DTOs
+numpy>=1.26             # motor analítico (estatística, regressão, álgebra matricial)
+pandas>=2.0             # leitura/tratamento de dados tabulares
+psycopg2-binary>=2.9    # driver do PostgreSQL (usado quando PREDICTA_USAR_POSTGRES=true)
+
+# Observação: a autenticação (JWT) e o hash de senha usam apenas a biblioteca
+# padrão do Python (hmac/hashlib), sem dependências externas.
+# Enquanto o banco não é plugado, a API roda no modo SEED (em memória).

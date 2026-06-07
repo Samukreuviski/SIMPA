@@ -25,3 +25,4 @@ function LoadingState({ type = 'page' }) {
 }
 
 window.LoadingState = LoadingState;
+

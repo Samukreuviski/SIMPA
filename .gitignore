@@ -15,3 +15,6 @@ ENV/
 # VS Code/IDE
 .vscode/
 .idea/
+
+# Rascunhos de sessão (não fazem parte do projeto)
+recover_inspect/

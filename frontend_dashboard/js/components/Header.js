@@ -14,7 +14,7 @@ function Header() {
         onError={e => {
           e.target.style.display = 'none';
           const span = document.createElement('span');
-          span.style.cssText = 'font-family:Montserrat,sans-serif;font-weight:800;font-size:1.4rem;color:#0B4F7C;letter-spacing:-.02em';
+          span.style.cssText = 'font-family: 'Poppins', sans-serif;font-weight:800;font-size:1.4rem;color:#0B4F7C;letter-spacing:-.02em';
           span.textContent = 'Predicta';
           e.target.parentNode.appendChild(span);
         }}
@@ -40,3 +40,4 @@ function Header() {
 }
 
 window.Header = Header;
+
